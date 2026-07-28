@@ -30,8 +30,27 @@ impl SignalStore {
     /// A wrong key makes SQLCipher report the decrypted header as "not a
     /// database" — surfaced here as [`SignalError::DbOpen`], never empty rows.
     pub fn open_at(db_path: &Path, key: &SqlcipherKey) -> Result<Self> {
-        let _ = (db_path, key);
-        todo!("GREEN implements the SQLCipher open")
+        // Read-only: forensic evidence is never modified.
+        let conn = Connection::open_with_flags(
+            db_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(SignalError::DbOpen)?;
+
+        // Raw-key form: PRAGMA key = "x'<hex>'" (SQLCipher 4 defaults, matching
+        // Signal). The quoted x'..' tells SQLCipher this is the raw key, no KDF.
+        conn.execute_batch(&format!("PRAGMA key = \"{}\";", key.as_pragma()))
+            .map_err(SignalError::DbOpen)?;
+
+        // Force a decrypt: a wrong key makes SQLCipher reject the header here
+        // ("file is not a database") rather than at first query — fail loud now,
+        // never hand back a store that silently reads zero rows.
+        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
+            r.get::<_, i64>(0)
+        })
+        .map_err(SignalError::DbOpen)?;
+
+        Ok(Self { conn })
     }
 
     /// Open the `sql/db.sqlite` inside a Signal profile directory. The relative
@@ -43,7 +62,45 @@ impl SignalStore {
 
     /// All conversations (contacts + groups).
     pub fn conversations(&self) -> Result<Vec<Conversation>> {
-        todo!("GREEN implements conversation parsing")
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, type, active_at, json FROM conversations")
+            .map_err(SignalError::Query)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })
+            .map_err(SignalError::Query)?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, typ, active_at, json) = row.map_err(SignalError::Query)?;
+            // Malformed json degrades to None fields — never a panic.
+            let v: Option<Value> = json.as_deref().and_then(|s| serde_json::from_str(s).ok());
+            let kind = ConversationKind::from_type(typ.as_deref().unwrap_or_default());
+            let (service_id, e164, name) = match &v {
+                Some(v) => (
+                    first_str(v, &["serviceId", "uuid"]),
+                    str_field(v, "e164"),
+                    first_str(v, &["name", "profileName", "profileFullName"]),
+                ),
+                None => (None, None, None),
+            };
+            out.push(Conversation {
+                id,
+                kind,
+                service_id,
+                e164,
+                name,
+                active_at,
+            });
+        }
+        Ok(out)
     }
 }
 
