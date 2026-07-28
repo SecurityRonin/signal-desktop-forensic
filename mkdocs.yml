@@ -12,6 +12,10 @@ nav:
   - Home: index.md
   - Validation: validation.md
   - Purpose & Scope: PRD.md
+  - Decisions:
+      - Reader/analyzer split: decisions/0001-reader-analyzer-split.md
+      - SQLCipher key pipeline: decisions/0002-sqlcipher-key-pipeline.md
+      - Panic-free fuzzed parsing: decisions/0003-panic-free-fuzzed-parsing.md
   - Privacy Policy: privacy.md
   - Terms of Service: terms.md
 markdown_extensions:
