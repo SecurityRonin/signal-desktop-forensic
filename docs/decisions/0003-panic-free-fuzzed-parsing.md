@@ -21,8 +21,11 @@ Adopt the fleet Paranoid Gatekeeper posture:
   badge — the crate holds no `unsafe`).
 - `clippy::unwrap_used` / `expect_used = "deny"` in production code; tests may
   unwrap.
-- Integer/length fields parsed from raw blobs go through the `safe-read` bounded
-  readers, never a hand-rolled `bytes.rs`.
+- This crate parses **no raw binary offsets**: structured data arrives through
+  `serde_json` (the JSON columns / `config.json`) and `rusqlite` (typed SQLCipher
+  columns), so there is no hand-rolled `bytes.rs` and `safe-read` is not pulled.
+  Should a future feature parse a raw byte layout, its integer/length reads must
+  go through the fleet `safe-read` bounded readers — never a hand-rolled reader.
 - One `cargo-fuzz` target per parsed structure: `fuzz_config` (the `config.json`
   JSON + hex decode), `fuzz_key_unwrap` (the v10-blob unwrap path), and
   `fuzz_message_json` (the per-message JSON decode). Invariant: never panic on

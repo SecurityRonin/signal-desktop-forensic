@@ -362,7 +362,7 @@ dependencies = [
  "des",
  "hmac",
  "pbkdf2",
- "safe-read 0.2.1",
+ "safe-read",
  "sha1",
  "thiserror",
 ]
@@ -521,12 +521,6 @@ dependencies = [
 
 [[package]]
 name = "safe-read"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4487a19fd870fa418cd95a218049eeb70514535bf2271715774d97d7caab1ce5"
-
-[[package]]
-name = "safe-read"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64d801355149a8e005d4736b4b7c7871e65b5797c31bc9930f5a5483e8368a47"
@@ -613,7 +607,6 @@ dependencies = [
  "forensicnomicon-core 1.4.0",
  "hex",
  "rusqlite",
- "safe-read 0.1.0",
  "serde",
  "serde_json",
  "tempfile",

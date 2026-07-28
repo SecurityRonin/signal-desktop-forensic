@@ -16,7 +16,6 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 hex = { workspace = true }
-safe-read = { workspace = true }
 rusqlite = { workspace = true }
 forensicnomicon-core = { workspace = true }
 chromium-safestorage-core = { workspace = true }

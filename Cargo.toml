@@ -31,9 +31,6 @@ serde_json = "1"
 # Mature, ubiquitous hex codec for the `encryptedKey` / raw-key hex fields —
 # reused rather than hand-rolling a decoder.
 hex = "0.4"
-# safe-read: the shared, fuzzed, panic-free bounded integer readers — the single
-# front door for every offset/length parsed from an attacker-controllable blob.
-safe-read = "0.1"
 # SQLCipher access. rusqlite bundles the audited SQLCipher C library + vendored
 # OpenSSL — the reference SQLCipher implementation, never a hand-rolled cipher.
 # A wrong key surfaces as a rusqlite error (mapped to a typed SignalError),
