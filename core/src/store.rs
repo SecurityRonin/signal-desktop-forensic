@@ -105,7 +105,53 @@ impl SignalStore {
 
     /// All messages.
     pub fn messages(&self) -> Result<Vec<Message>> {
-        todo!("GREEN implements message parsing")
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT id, conversationId, sent_at, received_at, type, body, json FROM messages",
+            )
+            .map_err(SignalError::Query)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                    row.get::<_, Option<i64>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                ))
+            })
+            .map_err(SignalError::Query)?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, conversation_id, sent_at, received_at, typ, body, json) =
+                row.map_err(SignalError::Query)?;
+            let v: Option<Value> = json.as_deref().and_then(|s| serde_json::from_str(s).ok());
+            let direction = Direction::from_type(typ.as_deref().unwrap_or_default());
+            let (source_service_id, has_attachments) = match &v {
+                Some(v) => (
+                    first_str(v, &["sourceServiceId", "source"]),
+                    v.get("attachments")
+                        .and_then(Value::as_array)
+                        .is_some_and(|a| !a.is_empty()),
+                ),
+                None => (None, false),
+            };
+            out.push(Message {
+                id,
+                conversation_id,
+                direction,
+                body,
+                sent_at,
+                received_at,
+                source_service_id,
+                has_attachments,
+            });
+        }
+        Ok(out)
     }
 }
 
