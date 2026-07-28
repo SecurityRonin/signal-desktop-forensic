@@ -157,7 +157,24 @@ impl SignalStore {
     /// Attachment metadata across all messages, parsed from each message's
     /// `json.attachments[]`.
     pub fn attachments(&self) -> Result<Vec<Attachment>> {
-        todo!("GREEN implements attachment metadata parsing")
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, json FROM messages")
+            .map_err(SignalError::Query)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+            })
+            .map_err(SignalError::Query)?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, json) = row.map_err(SignalError::Query)?;
+            if let Some(json) = json {
+                out.extend(parse_attachments_json(&id, &json));
+            }
+        }
+        Ok(out)
     }
 
     /// Contacts — the private conversations projected to their identity fields.
@@ -183,8 +200,22 @@ impl SignalStore {
 /// non-array value all yield an empty list.
 #[must_use]
 pub fn parse_attachments_json(message_id: &str, json: &str) -> Vec<Attachment> {
-    let _ = (message_id, json);
-    todo!("GREEN implements attachment json parsing")
+    let Ok(v) = serde_json::from_str::<Value>(json) else {
+        return Vec::new();
+    };
+    let Some(arr) = v.get("attachments").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    arr.iter()
+        .filter(|a| a.is_object())
+        .map(|a| Attachment {
+            message_id: message_id.to_owned(),
+            content_type: str_field(a, "contentType"),
+            file_name: str_field(a, "fileName"),
+            size: a.get("size").and_then(Value::as_i64),
+            path: str_field(a, "path"),
+        })
+        .collect()
 }
 
 /// Read a string field from a JSON object, if present and a string.
