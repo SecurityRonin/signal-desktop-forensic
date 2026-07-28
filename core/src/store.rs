@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use crate::error::{Result, SignalError};
 use crate::keys::SqlcipherKey;
-use crate::records::{Conversation, ConversationKind, Direction, Message};
+use crate::records::{Contact, Conversation, ConversationKind, Direction, Message};
 
 /// An opened, decrypted Signal database.
 pub struct SignalStore {
@@ -152,6 +152,11 @@ impl SignalStore {
             });
         }
         Ok(out)
+    }
+
+    /// Contacts — the private conversations projected to their identity fields.
+    pub fn contacts(&self) -> Result<Vec<Contact>> {
+        todo!("GREEN implements contact projection")
     }
 }
 
@@ -342,5 +347,19 @@ mod tests {
 
         let m3 = msgs.iter().find(|m| m.id == "msg-3").unwrap();
         assert_eq!(m3.source_service_id.as_deref(), Some("uuid-bob"));
+    }
+
+    #[test]
+    fn reads_contacts_from_private_conversations_only() {
+        let (_dir, db) = minted();
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let contacts = store.contacts().unwrap();
+        // Only the private conversation is a contact — the group is not.
+        assert_eq!(contacts.len(), 1);
+        let alice = &contacts[0];
+        assert_eq!(alice.conversation_id, "conv-alice");
+        assert_eq!(alice.e164.as_deref(), Some("+15551230001"));
+        assert_eq!(alice.name.as_deref(), Some("Alice"));
+        assert_eq!(alice.service_id.as_deref(), Some("uuid-alice"));
     }
 }
