@@ -36,5 +36,6 @@ pub mod keys;
 pub mod paths;
 pub mod records;
 pub mod store;
+pub mod timeline;
 
 pub use error::{Result, SignalError};

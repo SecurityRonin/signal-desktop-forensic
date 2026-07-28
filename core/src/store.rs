@@ -177,6 +177,11 @@ impl SignalStore {
         Ok(out)
     }
 
+    /// A timestamp-ordered timeline of all messages.
+    pub fn timeline(&self) -> Result<Vec<crate::timeline::TimelineEntry>> {
+        Ok(crate::timeline::build_timeline(&self.messages()?))
+    }
+
     /// Contacts — the private conversations projected to their identity fields.
     pub fn contacts(&self) -> Result<Vec<Contact>> {
         Ok(self
@@ -434,6 +439,18 @@ mod tests {
         assert_eq!(a.file_name.as_deref(), Some("pic.jpg"));
         assert_eq!(a.size, Some(20480));
         assert_eq!(a.path.as_deref(), Some("ab/abcdef0123"));
+    }
+
+    #[test]
+    fn timeline_is_time_ordered_over_the_store() {
+        let (_dir, db) = minted();
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let tl = store.timeline().unwrap();
+        assert_eq!(tl.len(), 3);
+        // Ascending by sent_at: msg-1 (…100k) < msg-2 (…200k) < msg-3 (…600k).
+        let ids: Vec<&str> = tl.iter().map(|e| e.message_id.as_str()).collect();
+        assert_eq!(ids, ["msg-1", "msg-2", "msg-3"]);
+        assert!(tl.windows(2).all(|w| w[0].timestamp <= w[1].timestamp));
     }
 
     #[test]
