@@ -1,0 +1,23 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Test corpus: large/real artifacts are gitignored and downloaded/minted per
+# the fleet Test-Data Provenance Standard. Small licensed fixtures are the only
+# committed bytes (documented in tests/data/README.md).
+/tests/data/*.sqlite
+/tests/data/*.db
+/tests/data/db.sqlite*
+/tests/data/config.real.json
+
+# fuzz build output + crash corpus
+/fuzz/target
+/fuzz/corpus
+/fuzz/artifacts

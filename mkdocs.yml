@@ -1,0 +1,24 @@
+site_name: signal-desktop-forensic
+site_url: https://securityronin.github.io/signal-desktop-forensic/
+repo_url: https://github.com/SecurityRonin/signal-desktop-forensic
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+    - scheme: slate
+      primary: indigo
+nav:
+  - Home: index.md
+  - Validation: validation.md
+  - Purpose & Scope: PRD.md
+  - Privacy Policy: privacy.md
+  - Terms of Service: terms.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.superfences
+plugins:
+  - search

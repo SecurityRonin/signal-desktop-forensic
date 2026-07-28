@@ -1,0 +1,78 @@
+[workspace]
+resolver = "2"
+members = ["core", "forensic"]
+# The fuzz crate is a separate workspace (its own Cargo.lock) so `cargo
+# build/test --workspace` never pulls libfuzzer-sys / the nightly sanitizer
+# machinery into the normal build.
+exclude = ["fuzz"]
+
+# Single source of truth for fields shared by every member (DRY). `version` is
+# NOT hoisted: core and forensic are versioned independently.
+[workspace.package]
+edition = "2021"
+# Floored at the crypto path dep chromium-safestorage-core (1.85). The fleet
+# low-MSRV promise cannot go below a dependency's floor; raise deliberately.
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/SecurityRonin/signal-desktop-forensic"
+homepage = "https://github.com/SecurityRonin/signal-desktop-forensic"
+authors = ["Albert Hui <albert@securityronin.com>"]
+categories = ["parser-implementations"]
+readme = "README.md"
+
+# Single source of truth for dependency versions (DRY): declare once; members
+# write `dep.workspace = true`. Fleet path deps are unpublished Wave-1/2 outputs
+# — switch to the registry version once each publishes (see the fleet rule).
+[workspace.dependencies]
+signal-desktop-core = { path = "core", version = "0.1.0" }
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# safe-read: the shared, fuzzed, panic-free bounded integer readers — the single
+# front door for every offset/length parsed from an attacker-controllable blob.
+safe-read = "0.1"
+# SQLCipher access. rusqlite bundles the audited SQLCipher C library + vendored
+# OpenSSL — the reference SQLCipher implementation, never a hand-rolled cipher.
+# A wrong key surfaces as a rusqlite error (mapped to a typed SignalError),
+# never a fabricated plaintext.
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+# KNOWLEDGE leaf: reused Signal path/store constants (messenger_desktop) + the
+# normalized report model (report). Path dep until the messenger_desktop module
+# ships in a published forensicnomicon-core.
+forensicnomicon-core = { path = "../../knowledge/forensicnomicon/crates/core", version = "1.4", features = ["serde"] }
+# The OS Safe Storage AES-key recovery + v10-blob decryption (RustCrypto). Path
+# dep until it publishes.
+chromium-safestorage-core = { path = "../../encryption/chromium-safestorage/core", version = "0.1" }
+tempfile = "3"
+
+[workspace.lints.rust]
+# Paranoid Gatekeeper: these crates parse untrusted, attacker-controllable
+# Signal artifacts (config.json blobs, SQLCipher rows, message JSON). The code
+# is unsafe-free and stays that way — earns the `unsafe-forbidden` README badge.
+unsafe_code = "forbid"
+unused_imports = "warn"
+unused_variables = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+# Panic-free production code: no unwrap/expect outside tests.
+unwrap_used = { level = "deny", priority = 0 }
+expect_used = { level = "deny", priority = 0 }
+# Pragmatic allows — pedantic lints that fight the domain, matching the fleet set.
+module_name_repetitions = { level = "allow", priority = 1 }
+must_use_candidate = { level = "allow", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 1 }
+missing_panics_doc = { level = "allow", priority = 1 }
+cast_possible_truncation = { level = "allow", priority = 1 }
+cast_possible_wrap = { level = "allow", priority = 1 }
+cast_sign_loss = { level = "allow", priority = 1 }
+cast_precision_loss = { level = "allow", priority = 1 }
+too_many_lines = { level = "allow", priority = 1 }
+items_after_statements = { level = "allow", priority = 1 }
+similar_names = { level = "allow", priority = 1 }
+manual_let_else = { level = "allow", priority = 1 }
+unreadable_literal = { level = "allow", priority = 1 }
+doc_markdown = { level = "allow", priority = 1 }

@@ -1,0 +1,13 @@
+# Allow unwrap()/expect() inside test functions and #[cfg(test)] modules.
+# Production code keeps clippy::unwrap_used/expect_used = deny (workspace
+# Cargo.toml); tests legitimately unwrap to fail loudly.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+
+# Signal / Chromium / crypto identifiers that look like code to
+# clippy::doc_markdown. Keeps doc comments prose-clean.
+doc-valid-idents = [
+    "SQLCipher", "SQLite", "IndexedDB", "LevelDB", "macOS", "iOS", "JSON",
+    "AES-128-CBC", "AES-256", "PBKDF2", "DPAPI", "Electron", "Chromium",
+    "UTF-8", "SHA-256", "serviceId", "conversationId", "encryptedKey",
+]

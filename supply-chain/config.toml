@@ -1,0 +1,31 @@
+# cargo-vet configuration.
+#
+# Our own published crates are declared FIRST-PARTY so a version bump never turns
+# the release PR's vet job red demanding a per-version audit (audit-as-crates-io
+# = false, per the fleet release rule). Fleet path deps not yet on crates.io are
+# exempt as first-party.
+
+[cargo-vet]
+version = "0.10"
+
+[policy.signal-desktop-core]
+audit-as-crates-io = false
+
+[policy.signal-desktop-forensic]
+audit-as-crates-io = false
+
+# Unpublished fleet path deps — first-party until they publish.
+[policy.forensicnomicon-core]
+audit-as-crates-io = false
+
+[policy.chromium-safestorage-core]
+audit-as-crates-io = false
+
+[imports.bytecode-alliance]
+url = "https://raw.githubusercontent.com/bytecodealliance/wasmtime/main/supply-chain/audits.toml"
+
+[imports.google]
+url = "https://raw.githubusercontent.com/google/supply-chain/main/audits.toml"
+
+[imports.mozilla]
+url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"

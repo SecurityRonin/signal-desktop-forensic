@@ -1,0 +1,7 @@
+# Only real changes cut a release; chore/ci/test/style/build churn never does,
+# and release-plz's own release commits are skipped.
+[workspace]
+release_commits = "^(feat|fix|perf|refactor|doc|revert)"
+# release-plz cuts per-crate tags `<crate>-vX.Y.Z` so they never collide with a
+# binary `v[0-9]*` tag.
+git_tag_name = "{{ package }}-v{{ version }}"

@@ -1,0 +1,24 @@
+[package]
+name = "signal-desktop-forensic"
+version = "0.1.0"
+description = "Signal Desktop anomaly auditor — grades a decrypted Signal profile into normalized forensicnomicon findings (disappearing-message posture, deleted-but-present records, attachment residue)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+signal-desktop-core = { workspace = true }
+forensicnomicon-core = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rusqlite = { workspace = true }
+
+[lints]
+workspace = true
