@@ -9,6 +9,8 @@ SQLCipher, the OS keystore, and Signal's JSON schema.
 ## In scope
 
 - Parse `config.json` (modern `encryptedKey`, legacy plaintext `key`).
+- Parse the unencrypted `ephemeral.json` (theme/spell-check/locale + last window
+  geometry — provenance and mild forensic context).
 - Unwrap the SQLCipher key from `encryptedKey` given an OS Safe Storage
   `RecoveredKey` (via `chromium-safestorage-core`).
 - Open `sql/db.sqlite` (SQLCipher 4) with the raw key; fail loud on a wrong key.

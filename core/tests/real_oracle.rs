@@ -11,6 +11,7 @@
 use std::path::PathBuf;
 
 use signal_desktop_core::config::SignalConfig;
+use signal_desktop_core::ephemeral::EphemeralConfig;
 use signal_desktop_core::{SignalError, SignalStore, SqlcipherKey};
 
 fn profile() -> Option<PathBuf> {
@@ -79,4 +80,27 @@ fn real_db_is_sqlcipher_and_rejects_a_wrong_key_loud() {
         "wrong key on the real encrypted DB must be a loud DbOpen error"
     );
     eprintln!("real oracle OK: real db.sqlite rejected a wrong SQLCipher key loudly");
+}
+
+#[test]
+fn real_ephemeral_json_parses() {
+    let Some(profile) = profile() else {
+        eprintln!("SIGNAL_PROFILE not set — skipping real ephemeral oracle");
+        return;
+    };
+    let path = profile.join("ephemeral.json");
+    if !path.exists() {
+        eprintln!("no real ephemeral.json — skipping");
+        return;
+    }
+    let e = EphemeralConfig::from_profile(&profile).expect("real ephemeral.json parses");
+    // A real profile always records window geometry.
+    let w = e.window.expect("real ephemeral carries window geometry");
+    assert!(w.width.unwrap_or(0) > 0 && w.height.unwrap_or(0) > 0);
+    eprintln!(
+        "real oracle OK: ephemeral.json theme={:?} window={}x{}",
+        e.theme,
+        w.width.unwrap_or(0),
+        w.height.unwrap_or(0)
+    );
 }

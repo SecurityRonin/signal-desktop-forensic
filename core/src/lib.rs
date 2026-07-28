@@ -40,6 +40,7 @@ pub mod store;
 pub mod timeline;
 
 pub use config::SignalConfig;
+pub use ephemeral::{EphemeralConfig, WindowState};
 pub use error::{Result, SignalError};
 pub use keys::{unwrap_sqlcipher_key, SqlcipherKey};
 pub use records::{Attachment, Contact, Conversation, ConversationKind, Direction, Message};

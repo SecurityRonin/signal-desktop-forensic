@@ -61,8 +61,7 @@ pub struct WindowState {
 impl EphemeralConfig {
     /// Parse `ephemeral.json` from its raw bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let _ = bytes;
-        todo!("GREEN implements ephemeral.json parsing")
+        serde_json::from_slice(bytes).map_err(SignalError::EphemeralJson)
     }
 
     /// Read and parse `ephemeral.json` from a Signal profile directory.
