@@ -38,4 +38,13 @@ pub mod records;
 pub mod store;
 pub mod timeline;
 
+pub use config::SignalConfig;
 pub use error::{Result, SignalError};
+pub use keys::{unwrap_sqlcipher_key, SqlcipherKey};
+pub use records::{Attachment, Contact, Conversation, ConversationKind, Direction, Message};
+pub use store::SignalStore;
+pub use timeline::{build_timeline, TimelineEntry};
+
+// Re-export the OS key type callers pass into the pipeline, so a consumer can
+// wire the whole chain from this one crate.
+pub use chromium_safestorage_core::RecoveredKey;
