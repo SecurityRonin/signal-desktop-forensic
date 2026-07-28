@@ -1,0 +1,34 @@
+[package]
+name = "signal-desktop-forensic-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+signal-desktop-core = { path = "../core" }
+chromium-safestorage-core = { path = "../../../encryption/chromium-safestorage/core" }
+
+[[bin]]
+name = "fuzz_config"
+path = "fuzz_targets/fuzz_config.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_key_unwrap"
+path = "fuzz_targets/fuzz_key_unwrap.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_message_json"
+path = "fuzz_targets/fuzz_message_json.rs"
+test = false
+doc = false
+bench = false
