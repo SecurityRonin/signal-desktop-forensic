@@ -10,6 +10,10 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod analyze;
+
+pub use analyze::{audit, audit_store, SignalAnomaly};
+
 /// Analyzer name stamped on every emitted [`Source`].
 ///
 /// [`Source`]: forensicnomicon_core::report::Source
