@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use crate::error::{Result, SignalError};
 use crate::keys::SqlcipherKey;
-use crate::records::{Contact, Conversation, ConversationKind, Direction, Message};
+use crate::records::{Attachment, Contact, Conversation, ConversationKind, Direction, Message};
 
 /// An opened, decrypted Signal database.
 pub struct SignalStore {
@@ -154,6 +154,12 @@ impl SignalStore {
         Ok(out)
     }
 
+    /// Attachment metadata across all messages, parsed from each message's
+    /// `json.attachments[]`.
+    pub fn attachments(&self) -> Result<Vec<Attachment>> {
+        todo!("GREEN implements attachment metadata parsing")
+    }
+
     /// Contacts — the private conversations projected to their identity fields.
     pub fn contacts(&self) -> Result<Vec<Contact>> {
         Ok(self
@@ -168,6 +174,17 @@ impl SignalStore {
             })
             .collect())
     }
+}
+
+/// Parse the `attachments[]` array out of one message's `json` column.
+///
+/// This is the untrusted-input parser fuzzed by `fuzz_message_json`: arbitrary
+/// bytes in, never a panic. Malformed json, a missing `attachments` key, or a
+/// non-array value all yield an empty list.
+#[must_use]
+pub fn parse_attachments_json(message_id: &str, json: &str) -> Vec<Attachment> {
+    let _ = (message_id, json);
+    todo!("GREEN implements attachment json parsing")
 }
 
 /// Read a string field from a JSON object, if present and a string.
@@ -371,5 +388,28 @@ mod tests {
         assert_eq!(alice.e164.as_deref(), Some("+15551230001"));
         assert_eq!(alice.name.as_deref(), Some("Alice"));
         assert_eq!(alice.service_id.as_deref(), Some("uuid-alice"));
+    }
+
+    #[test]
+    fn reads_attachment_metadata() {
+        let (_dir, db) = minted();
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let atts = store.attachments().unwrap();
+        // Only msg-2 carries an attachment.
+        assert_eq!(atts.len(), 1);
+        let a = &atts[0];
+        assert_eq!(a.message_id, "msg-2");
+        assert_eq!(a.content_type.as_deref(), Some("image/jpeg"));
+        assert_eq!(a.file_name.as_deref(), Some("pic.jpg"));
+        assert_eq!(a.size, Some(20480));
+        assert_eq!(a.path.as_deref(), Some("ab/abcdef0123"));
+    }
+
+    #[test]
+    fn parse_attachments_tolerates_garbage() {
+        // A malformed json column must never panic — it yields no attachments.
+        assert!(parse_attachments_json("m", "not json").is_empty());
+        assert!(parse_attachments_json("m", r#"{"attachments":"nope"}"#).is_empty());
+        assert!(parse_attachments_json("m", r#"{"no_attachments_key":1}"#).is_empty());
     }
 }
