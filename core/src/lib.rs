@@ -32,6 +32,7 @@
 
 pub mod config;
 pub mod error;
+pub mod keys;
 pub mod paths;
 
 pub use error::{Result, SignalError};

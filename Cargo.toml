@@ -47,6 +47,11 @@ forensicnomicon-core = { path = "../../knowledge/forensicnomicon/crates/core", v
 # dep until it publishes.
 chromium-safestorage-core = { path = "../../encryption/chromium-safestorage/core", version = "0.1" }
 tempfile = "3"
+# Test-only: mint a Chromium v10 blob (AES-128-CBC encrypt) to round-trip the
+# key-unwrap path. Same RustCrypto crates chromium-safestorage decrypts with.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+cipher = { version = "0.4", features = ["alloc", "block-padding"] }
 
 [workspace.lints.rust]
 # Paranoid Gatekeeper: these crates parse untrusted, attacker-controllable
