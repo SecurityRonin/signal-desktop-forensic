@@ -31,8 +31,19 @@ impl std::fmt::Debug for SqlcipherKey {
 impl SqlcipherKey {
     /// Validate a 64-lowercase-hex-char SQLCipher key.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
-        let _ = hex_str;
-        todo!("GREEN implements key validation")
+        // A Signal SQLCipher raw key is exactly 32 bytes = 64 hex chars.
+        if hex_str.len() != 64 {
+            return Err(SignalError::BadSqlcipherKeyLength { len: hex_str.len() });
+        }
+        // Must actually be hex (decode confirms it); normalize to lowercase so
+        // the PRAGMA is deterministic.
+        let lower = hex_str.to_ascii_lowercase();
+        if hex::decode(&lower).is_err() {
+            return Err(SignalError::ConfigKeyNotHex {
+                prefix: hex_str.chars().take(8).collect(),
+            });
+        }
+        Ok(Self { hex: lower })
     }
 
     /// The key as a SQLCipher `PRAGMA key` argument: `x'<64 hex>'` (raw key, no
@@ -55,8 +66,29 @@ pub fn unwrap_sqlcipher_key(
     recovered: &RecoveredKey,
     config: &SignalConfig,
 ) -> Result<SqlcipherKey> {
-    let _ = (recovered, config);
-    todo!("GREEN implements the key unwrap")
+    // Legacy path: the key is already the plaintext hex string.
+    if let Some(legacy) = &config.legacy_key_hex {
+        return SqlcipherKey::from_hex(legacy);
+    }
+
+    // Modern path: decrypt the v10 blob with the OS Safe Storage key. A wrong
+    // key surfaces as a padding failure inside decrypt_cookie — loud, never a
+    // fabricated key.
+    let Some(blob) = &config.encrypted_key else {
+        return Err(SignalError::NoKeyField);
+    };
+    let plaintext = recovered
+        .decrypt_cookie(blob)
+        .map_err(SignalError::KeyUnwrap)?;
+
+    // The decrypted plaintext is the ASCII hex key. A wrong-but-valid-padding
+    // result, or a truncated key, fails the length/hex check below — never
+    // proceeds with a guessed key.
+    let hex_str =
+        std::str::from_utf8(&plaintext).map_err(|_| SignalError::BadSqlcipherKeyLength {
+            len: plaintext.len(),
+        })?;
+    SqlcipherKey::from_hex(hex_str)
 }
 
 #[cfg(test)]
