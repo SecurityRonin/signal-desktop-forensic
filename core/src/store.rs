@@ -156,7 +156,17 @@ impl SignalStore {
 
     /// Contacts — the private conversations projected to their identity fields.
     pub fn contacts(&self) -> Result<Vec<Contact>> {
-        todo!("GREEN implements contact projection")
+        Ok(self
+            .conversations()?
+            .into_iter()
+            .filter(|c| c.kind == ConversationKind::Private)
+            .map(|c| Contact {
+                conversation_id: c.id,
+                service_id: c.service_id,
+                e164: c.e164,
+                name: c.name,
+            })
+            .collect())
     }
 }
 
