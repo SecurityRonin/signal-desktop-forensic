@@ -100,8 +100,39 @@ pub fn audit(
     messages: &[Message],
     attachments: &[Attachment],
 ) -> Vec<Finding> {
-    let _ = (conversations, messages, attachments);
-    todo!("GREEN implements record auditing")
+    use std::collections::HashSet;
+
+    let known: HashSet<&str> = conversations.iter().map(|c| c.id.as_str()).collect();
+    let src = source();
+    let mut findings = Vec::new();
+
+    for m in messages {
+        if let Some(cid) = &m.conversation_id {
+            if !known.contains(cid.as_str()) {
+                findings.push(
+                    SignalAnomaly::OrphanMessage {
+                        message_id: m.id.clone(),
+                        conversation_id: cid.clone(),
+                    }
+                    .to_finding(src.clone()),
+                );
+            }
+        }
+    }
+
+    for a in attachments {
+        if let Some(path) = &a.path {
+            findings.push(
+                SignalAnomaly::AttachmentResidue {
+                    message_id: a.message_id.clone(),
+                    path: path.clone(),
+                }
+                .to_finding(src.clone()),
+            );
+        }
+    }
+
+    findings
 }
 
 /// Open the store's records and grade them.
