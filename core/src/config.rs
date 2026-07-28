@@ -38,14 +38,35 @@ struct RawConfig {
 impl SignalConfig {
     /// Parse `config.json` from its raw bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let _ = bytes;
-        todo!("GREEN step implements config.json parsing")
+        let raw: RawConfig = serde_json::from_slice(bytes).map_err(SignalError::ConfigJson)?;
+
+        let encrypted_key = match raw.encrypted_key {
+            Some(hex_str) => Some(decode_hex(&hex_str)?),
+            None => None,
+        };
+
+        if encrypted_key.is_none() && raw.key.is_none() {
+            return Err(SignalError::NoKeyField);
+        }
+
+        Ok(Self {
+            encrypted_key,
+            legacy_key_hex: raw.key,
+        })
     }
 
     /// Read and parse `config.json` from a Signal profile directory.
+    ///
+    /// The relative path (`config.json`) is taken from the KNOWLEDGE leaf via
+    /// [`crate::paths`], not hardcoded here.
     pub fn from_profile(profile: &Path) -> Result<Self> {
-        let _ = profile;
-        todo!("GREEN step implements profile config read")
+        let rel = crate::paths::config_relpath().unwrap_or("config.json");
+        let path = profile.join(rel);
+        let bytes = std::fs::read(&path).map_err(|source| SignalError::ConfigRead {
+            path: path.display().to_string(),
+            source,
+        })?;
+        Self::from_bytes(&bytes)
     }
 
     /// Whether the config carries any usable key material.
@@ -53,6 +74,14 @@ impl SignalConfig {
     pub fn has_key(&self) -> bool {
         self.encrypted_key.is_some() || self.legacy_key_hex.is_some()
     }
+}
+
+/// Decode a lowercase-or-uppercase hex string, mapping a non-hex value to a
+/// loud [`SignalError::ConfigKeyNotHex`] carrying the offending prefix.
+fn decode_hex(s: &str) -> Result<Vec<u8>> {
+    hex::decode(s).map_err(|_| SignalError::ConfigKeyNotHex {
+        prefix: s.chars().take(8).collect(),
+    })
 }
 
 #[cfg(test)]
