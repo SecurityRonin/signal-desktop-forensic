@@ -12,8 +12,8 @@ use thiserror::Error;
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum SignalError {
-    /// `config.json` could not be read from disk.
-    #[error("cannot read config.json at {path}: {source}")]
+    /// A profile file could not be read from disk (carries the path).
+    #[error("cannot read {path}: {source}")]
     ConfigRead {
         /// The path that failed.
         path: String,
@@ -24,6 +24,10 @@ pub enum SignalError {
     /// `config.json` is not valid JSON.
     #[error("config.json is not valid JSON: {0}")]
     ConfigJson(#[source] serde_json::Error),
+
+    /// `ephemeral.json` is not valid JSON.
+    #[error("ephemeral.json is not valid JSON: {0}")]
+    EphemeralJson(#[source] serde_json::Error),
 
     /// `config.json` carries neither a modern `encryptedKey` nor a legacy `key`.
     #[error("config.json has no `encryptedKey` (modern) or `key` (legacy) field")]
