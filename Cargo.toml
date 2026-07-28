@@ -28,6 +28,9 @@ signal-desktop-core = { path = "core", version = "0.1.0" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Mature, ubiquitous hex codec for the `encryptedKey` / raw-key hex fields —
+# reused rather than hand-rolling a decoder.
+hex = "0.4"
 # safe-read: the shared, fuzzed, panic-free bounded integer readers — the single
 # front door for every offset/length parsed from an attacker-controllable blob.
 safe-read = "0.1"
