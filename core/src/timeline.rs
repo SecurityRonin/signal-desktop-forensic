@@ -28,8 +28,19 @@ const SUMMARY_CHARS: usize = 80;
 /// Build a timestamp-ordered timeline from parsed messages.
 #[must_use]
 pub fn build_timeline(messages: &[Message]) -> Vec<TimelineEntry> {
-    let _ = messages;
-    todo!("GREEN implements timeline building")
+    let mut entries: Vec<TimelineEntry> = messages
+        .iter()
+        .map(|m| TimelineEntry {
+            timestamp: m.sent_at.or(m.received_at).unwrap_or(0),
+            conversation_id: m.conversation_id.clone(),
+            message_id: m.id.clone(),
+            direction: m.direction.clone(),
+            summary: preview(m.body.as_deref(), m.has_attachments),
+        })
+        .collect();
+    // Stable sort keeps input order among equal timestamps (deterministic).
+    entries.sort_by_key(|e| e.timestamp);
+    entries
 }
 
 /// Char-safe body preview — never slices mid-code-point (real bodies are full
