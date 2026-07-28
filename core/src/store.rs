@@ -1,0 +1,215 @@
+//! Open the decrypted SQLCipher database and read typed records.
+//!
+//! [`SignalStore::open_at`] opens `sql/db.sqlite` **read-only** (forensic
+//! posture — evidence is never modified) with the SQLCipher raw key, then reads
+//! [`Conversation`], [`Message`], [`Contact`], and [`Attachment`] records and a
+//! merged timeline.
+//!
+//! Identity fields that drift across Signal versions (`serviceId`/`uuid`, group
+//! name, `sourceServiceId`) are read from each row's `json` column rather than
+//! from a volatile denormalized column — parsed defensively (a malformed row's
+//! json degrades to `None` fields, never a panic).
+
+use std::path::Path;
+
+use rusqlite::{Connection, OpenFlags};
+use serde_json::Value;
+
+use crate::error::{Result, SignalError};
+use crate::keys::SqlcipherKey;
+use crate::records::{Conversation, ConversationKind};
+
+/// An opened, decrypted Signal database.
+pub struct SignalStore {
+    conn: Connection,
+}
+
+impl SignalStore {
+    /// Open a `db.sqlite` file directly with the SQLCipher raw key.
+    ///
+    /// A wrong key makes SQLCipher report the decrypted header as "not a
+    /// database" — surfaced here as [`SignalError::DbOpen`], never empty rows.
+    pub fn open_at(db_path: &Path, key: &SqlcipherKey) -> Result<Self> {
+        let _ = (db_path, key);
+        todo!("GREEN implements the SQLCipher open")
+    }
+
+    /// Open the `sql/db.sqlite` inside a Signal profile directory. The relative
+    /// path is taken from the KNOWLEDGE leaf, not hardcoded.
+    pub fn open_profile(profile: &Path, key: &SqlcipherKey) -> Result<Self> {
+        let rel = crate::paths::messages_db_relpath().unwrap_or("sql/db.sqlite");
+        Self::open_at(&profile.join(rel), key)
+    }
+
+    /// All conversations (contacts + groups).
+    pub fn conversations(&self) -> Result<Vec<Conversation>> {
+        todo!("GREEN implements conversation parsing")
+    }
+}
+
+/// Read a string field from a JSON object, if present and a string.
+fn str_field(v: &Value, key: &str) -> Option<String> {
+    v.get(key)?.as_str().map(str::to_owned)
+}
+
+/// First present string among several candidate keys (schema drift tolerance).
+fn first_str(v: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|k| str_field(v, k))
+}
+
+#[cfg(test)]
+pub(crate) mod testsupport {
+    //! Mint a real SQLCipher database in Signal's documented schema, for the
+    //! structural (tier-2/3) validation described in `docs/validation.md`.
+
+    use super::*;
+    use rusqlite::Connection;
+
+    /// The known raw key every minted fixture is encrypted with.
+    pub(crate) const FIXTURE_KEY_HEX: &str =
+        "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
+    pub(crate) fn fixture_key() -> SqlcipherKey {
+        SqlcipherKey::from_hex(FIXTURE_KEY_HEX).expect("valid fixture key")
+    }
+
+    /// Create a minted `db.sqlite` at `db_path` carrying a canonical dataset:
+    /// two conversations (one private contact "Alice", one group "Team") and
+    /// three messages (incoming text, outgoing with one image attachment,
+    /// incoming group text).
+    pub(crate) fn mint_signal_db(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("open new db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "CREATE TABLE conversations (
+                 id TEXT PRIMARY KEY,
+                 type TEXT,
+                 active_at INTEGER,
+                 json TEXT
+             );
+             CREATE TABLE messages (
+                 id TEXT PRIMARY KEY,
+                 conversationId TEXT,
+                 sent_at INTEGER,
+                 received_at INTEGER,
+                 type TEXT,
+                 body TEXT,
+                 json TEXT
+             );",
+        )
+        .expect("create schema");
+
+        let conversations = [
+            (
+                "conv-alice",
+                "private",
+                1_700_000_000_000i64,
+                r#"{"id":"conv-alice","type":"private","serviceId":"uuid-alice","e164":"+15551230001","profileName":"Alice"}"#,
+            ),
+            (
+                "conv-team",
+                "group",
+                1_700_000_500_000i64,
+                r#"{"id":"conv-team","type":"group","name":"Team"}"#,
+            ),
+        ];
+        for (id, typ, active_at, json) in conversations {
+            conn.execute(
+                "INSERT INTO conversations (id, type, active_at, json) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![id, typ, active_at, json],
+            )
+            .expect("insert conversation");
+        }
+
+        let messages = [
+            (
+                "msg-1",
+                "conv-alice",
+                1_700_000_100_000i64,
+                1_700_000_100_050i64,
+                "incoming",
+                "hey there",
+                r#"{"id":"msg-1","conversationId":"conv-alice","sourceServiceId":"uuid-alice","attachments":[]}"#,
+            ),
+            (
+                "msg-2",
+                "conv-alice",
+                1_700_000_200_000,
+                1_700_000_200_010,
+                "outgoing",
+                "photo!",
+                r#"{"id":"msg-2","conversationId":"conv-alice","attachments":[{"contentType":"image/jpeg","fileName":"pic.jpg","size":20480,"path":"ab/abcdef0123"}]}"#,
+            ),
+            (
+                "msg-3",
+                "conv-team",
+                1_700_000_600_000,
+                1_700_000_600_030,
+                "incoming",
+                "gm all",
+                r#"{"id":"msg-3","conversationId":"conv-team","sourceServiceId":"uuid-bob","attachments":[]}"#,
+            ),
+        ];
+        for (id, conv, sent, recv, typ, body, json) in messages {
+            conn.execute(
+                "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![id, conv, sent, recv, typ, body, json],
+            )
+            .expect("insert message");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testsupport::{fixture_key, mint_signal_db, FIXTURE_KEY_HEX};
+    use super::*;
+    use crate::keys::SqlcipherKey;
+
+    fn minted() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("db.sqlite");
+        mint_signal_db(&db);
+        (dir, db)
+    }
+
+    #[test]
+    fn opens_with_correct_key() {
+        let (_dir, db) = minted();
+        assert!(SignalStore::open_at(&db, &fixture_key()).is_ok());
+    }
+
+    #[test]
+    fn wrong_key_fails_loud() {
+        let (_dir, db) = minted();
+        let wrong =
+            SqlcipherKey::from_hex(&FIXTURE_KEY_HEX.replace("00112233", "ffffffff")).unwrap();
+        // A wrong key must be a loud DbOpen error, never a store that reads zero
+        // rows (which is indistinguishable from an empty DB).
+        assert!(matches!(
+            SignalStore::open_at(&db, &wrong),
+            Err(SignalError::DbOpen(_))
+        ));
+    }
+
+    #[test]
+    fn reads_conversations() {
+        let (_dir, db) = minted();
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let convs = store.conversations().unwrap();
+        assert_eq!(convs.len(), 2);
+
+        let alice = convs.iter().find(|c| c.id == "conv-alice").unwrap();
+        assert_eq!(alice.kind, ConversationKind::Private);
+        assert_eq!(alice.e164.as_deref(), Some("+15551230001"));
+        assert_eq!(alice.name.as_deref(), Some("Alice"));
+        assert_eq!(alice.service_id.as_deref(), Some("uuid-alice"));
+        assert_eq!(alice.active_at, Some(1_700_000_000_000));
+
+        let team = convs.iter().find(|c| c.id == "conv-team").unwrap();
+        assert_eq!(team.kind, ConversationKind::Group);
+        assert_eq!(team.name.as_deref(), Some("Team"));
+    }
+}

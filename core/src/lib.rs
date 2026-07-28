@@ -34,5 +34,7 @@ pub mod config;
 pub mod error;
 pub mod keys;
 pub mod paths;
+pub mod records;
+pub mod store;
 
 pub use error::{Result, SignalError};
