@@ -55,6 +55,22 @@ open-source and the Bilz "Forensic Gold Mine II" writeup (cited in the KNOWLEDGE
 leaf), not invented — but the *values* are ours, so a real-world quirk (a schema
 revision, an unusual `type`, an odd JSON shape) could be missed.
 
+## Robustness (fuzzing) — measured
+
+One `cargo-fuzz` target per untrusted-input parser, built under the nightly
+address sanitizer and smoke-run locally (20 s each):
+
+| Target | Parser | Execs (local smoke) | Result |
+|---|---|---|---|
+| `fuzz_config` | `config.json` decode | ~4.6M | no crash |
+| `fuzz_key_unwrap` | v10 key-unwrap path | ~3.2M | no crash |
+| `fuzz_message_json` | attachment JSON | ~2.9M | no crash |
+
+~10.7M total executions, zero panics — present-robustness evidence, paired with
+the static `panic-free by lint` posture (`forbid(unsafe)`,
+`unwrap_used`/`expect_used = deny`). Fuzzing tests robustness empirically; it does
+not prove the absence of all panics.
+
 ## What would upgrade this to T1
 
 1. A **public DFIR/DLEAPP Signal Desktop sample** (an `sql/db.sqlite` +
