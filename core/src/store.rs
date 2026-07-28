@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use crate::error::{Result, SignalError};
 use crate::keys::SqlcipherKey;
-use crate::records::{Conversation, ConversationKind};
+use crate::records::{Conversation, ConversationKind, Direction, Message};
 
 /// An opened, decrypted Signal database.
 pub struct SignalStore {
@@ -101,6 +101,11 @@ impl SignalStore {
             });
         }
         Ok(out)
+    }
+
+    /// All messages.
+    pub fn messages(&self) -> Result<Vec<Message>> {
+        todo!("GREEN implements message parsing")
     }
 }
 
@@ -268,5 +273,28 @@ mod tests {
         let team = convs.iter().find(|c| c.id == "conv-team").unwrap();
         assert_eq!(team.kind, ConversationKind::Group);
         assert_eq!(team.name.as_deref(), Some("Team"));
+    }
+
+    #[test]
+    fn reads_messages() {
+        let (_dir, db) = minted();
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let msgs = store.messages().unwrap();
+        assert_eq!(msgs.len(), 3);
+
+        let m1 = msgs.iter().find(|m| m.id == "msg-1").unwrap();
+        assert_eq!(m1.direction, Direction::Incoming);
+        assert_eq!(m1.body.as_deref(), Some("hey there"));
+        assert_eq!(m1.conversation_id.as_deref(), Some("conv-alice"));
+        assert_eq!(m1.sent_at, Some(1_700_000_100_000));
+        assert_eq!(m1.source_service_id.as_deref(), Some("uuid-alice"));
+        assert!(!m1.has_attachments);
+
+        let m2 = msgs.iter().find(|m| m.id == "msg-2").unwrap();
+        assert_eq!(m2.direction, Direction::Outgoing);
+        assert!(m2.has_attachments);
+
+        let m3 = msgs.iter().find(|m| m.id == "msg-3").unwrap();
+        assert_eq!(m3.source_service_id.as_deref(), Some("uuid-bob"));
     }
 }
