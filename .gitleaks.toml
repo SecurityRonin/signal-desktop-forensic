@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+# 0123456789abcdef is a documented placeholder key used only in unit tests
+# (config-format parse test + a KAT constant) — not a secret. Allowlist that
+# exact value; everything else stays scanned.
+[allowlist]
+description = "Test placeholder key 0123456789abcdef is not a secret"
+regexes = ['''0123456789abcdef''']
