@@ -10,7 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 signal-desktop-core = { path = "../core" }
-chromium-safestorage-core = { path = "../../chromium-safestorage/core" }
+chromium-safestorage-core = "0.1"
 
 [[bin]]
 name = "fuzz_config"

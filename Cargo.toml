@@ -10,7 +10,7 @@ exclude = ["fuzz"]
 # NOT hoisted: core and forensic are versioned independently.
 [workspace.package]
 edition = "2021"
-# Floored at the crypto path dep chromium-safestorage-core (1.85). The fleet
+# Floored at the crypto dep chromium-safestorage-core (1.85). The fleet
 # low-MSRV promise cannot go below a dependency's floor; raise deliberately.
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -37,12 +37,11 @@ hex = "0.4"
 # never a fabricated plaintext.
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 # KNOWLEDGE leaf: reused Signal path/store constants (messenger_desktop) + the
-# normalized report model (report). Path dep until the messenger_desktop module
-# ships in a published forensicnomicon-core.
-forensicnomicon-core = { path = "../../knowledge/forensicnomicon/crates/core", version = "1.4", features = ["serde"] }
-# The OS Safe Storage AES-key recovery + v10-blob decryption (RustCrypto). Path
-# dep until it publishes.
-chromium-safestorage-core = { path = "../chromium-safestorage/core", version = "0.1" }
+# normalized report model (report). Registry crate (published).
+forensicnomicon-core = { version = "1.5", features = ["serde"] }
+# The OS Safe Storage AES-key recovery + v10-blob decryption (RustCrypto).
+# Registry crate (published).
+chromium-safestorage-core = { version = "0.1" }
 tempfile = "3"
 # Test-only: mint a Chromium v10 blob (AES-128-CBC encrypt) to round-trip the
 # key-unwrap path. Same RustCrypto crates chromium-safestorage decrypts with.

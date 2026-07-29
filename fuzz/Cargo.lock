@@ -115,6 +115,8 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 [[package]]
 name = "chromium-safestorage-core"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f0d3b722f3094cdfe4ada87815c4e1d30abf967ae9d6e616c2336426156728a"
 dependencies = [
  "aes",
  "cbc",
@@ -189,7 +191,9 @@ dependencies = [
 
 [[package]]
 name = "dpapi-core"
-version = "0.2.0"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5256166c775fb9678e874fa5024330c2e580e47e1a5f18744184bb652633ae3c"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -228,22 +232,18 @@ version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feb4755bb43fc9c85fbf91bf37399f2f3ca958f35a7e90ca6a4f6f25a6664604"
 dependencies = [
- "forensicnomicon-core 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forensicnomicon-core",
  "forensicnomicon-data",
 ]
 
 [[package]]
 name = "forensicnomicon-core"
-version = "1.4.0"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21800c5e29085274fbb324be30790894481c9c5faf8c659b3d0d994840ca0941"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "forensicnomicon-core"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d65a733200c34a6595461a80c6a3ca95816c63b55104ef72630c5324a74a6680"
 
 [[package]]
 name = "forensicnomicon-data"
@@ -251,7 +251,7 @@ version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826351faee29aabf7561d741e4fabb56b2b237be6c8d483c4df181e93b5f8b67"
 dependencies = [
- "forensicnomicon-core 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forensicnomicon-core",
 ]
 
 [[package]]
@@ -358,13 +358,15 @@ dependencies = [
 [[package]]
 name = "keychain-core"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c96c0c8e8a14efea3726225be371be924dc8a79c5e4cc430e912d41111763d7"
 dependencies = [
  "cbc",
  "cipher",
  "des",
  "hmac",
  "pbkdf2",
- "safe-read 0.2.1",
+ "safe-read",
  "sha1",
  "thiserror",
 ]
@@ -514,12 +516,6 @@ dependencies = [
 
 [[package]]
 name = "safe-read"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4487a19fd870fa418cd95a218049eeb70514535bf2271715774d97d7caab1ce5"
-
-[[package]]
-name = "safe-read"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64d801355149a8e005d4736b4b7c7871e65b5797c31bc9930f5a5483e8368a47"
@@ -600,10 +596,9 @@ name = "signal-desktop-core"
 version = "0.1.0"
 dependencies = [
  "chromium-safestorage-core",
- "forensicnomicon-core 1.4.0",
+ "forensicnomicon-core",
  "hex",
  "rusqlite",
- "safe-read 0.1.0",
  "serde",
  "serde_json",
  "thiserror",
