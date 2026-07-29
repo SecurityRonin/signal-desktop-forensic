@@ -42,7 +42,7 @@ rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"]
 forensicnomicon-core = { path = "../../knowledge/forensicnomicon/crates/core", version = "1.4", features = ["serde"] }
 # The OS Safe Storage AES-key recovery + v10-blob decryption (RustCrypto). Path
 # dep until it publishes.
-chromium-safestorage-core = { path = "../../encryption/chromium-safestorage/core", version = "0.1" }
+chromium-safestorage-core = { path = "../chromium-safestorage/core", version = "0.1" }
 tempfile = "3"
 # Test-only: mint a Chromium v10 blob (AES-128-CBC encrypt) to round-trip the
 # key-unwrap path. Same RustCrypto crates chromium-safestorage decrypts with.
