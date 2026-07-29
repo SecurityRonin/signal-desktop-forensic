@@ -45,6 +45,51 @@ jobs:
       - uses: Swatinem/rust-cache@9bdad043e88c75890e36ad3bbc8d27f0090dd609 # v2
       - run: cargo build --workspace
 
+  coverage:
+    name: Coverage (100% function gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@9bdad043e88c75890e36ad3bbc8d27f0090dd609 # v2
+      - uses: taiki-e/install-action@a402910a723481c4c80d006d75298c796a9c8695 # cargo-llvm-cov
+        with:
+          tool: cargo-llvm-cov
+      # 100% FUNCTION coverage of the library source, honoring `// cov:unreachable`
+      # markers on provably-dead defensive arms (the gate script exempts them).
+      - name: Coverage + 100% function gate
+        run: |
+          cargo llvm-cov --all-features --json --output-path cov.json
+          python3 scripts/coverage-gate.py cov.json
+      - name: Emit lcov
+        run: cargo llvm-cov report --lcov --output-path lcov.info
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@0f8570b1a125f4937846a11fcfa3bcd548bd8c97 # v4.6.0
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  vet:
+    name: Cargo Vet (supply-chain)
+    runs-on: ubuntu-latest
+    # Complements `deny` (known-bad advisories/licenses) with the supply-chain-
+    # injection layer: every dependency version must be human-source-reviewed or
+    # covered by an imported aggregate audit set. Config in supply-chain/.
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-vet
+        uses: taiki-e/install-action@59012be0884e296ca2da49b530610e72c49039ad # v2.81.6
+        with:
+          tool: cargo-vet
+      - name: Fetch dependencies
+        run: cargo fetch
+      - name: Check supply chain
+        run: cargo vet --locked
+
   deny:
     name: cargo-deny
     runs-on: ubuntu-latest
