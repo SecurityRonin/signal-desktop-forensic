@@ -48,12 +48,56 @@ raw key and parsed back.
 | Key unwrap (wrong key ⇒ loud error) | **T2** | Real v10 blob + audited RustCrypto AES-128-CBC; wrong key ⇒ PKCS#7 failure |
 | SQLCipher open (wrong key ⇒ loud error) | **T2** | Reference SQLCipher library; wrong key ⇒ "not a database" |
 | Record schema (`messages`/`conversations`/attachment JSON) | **T3→T2** | Minted SQLCipher DB in Signal's documented schema (self-constructed scenario; we chose the rows) |
+| Reader row read reconciled against an independent decrypt+read | **T2** | The `sqlcipher` CLI (a separate SQLCipher build + process) over the same minted DB — see below |
 
 The record-schema row is **not tier-1**: no independent party authored both the
 artifact and the answer key. The schema itself is taken from Signal's
 open-source and the Bilz "Forensic Gold Mine II" writeup (cited in the KNOWLEDGE
 leaf), not invented — but the *values* are ours, so a real-world quirk (a schema
 revision, an unusual `type`, an odd JSON shape) could be missed.
+
+## Differential against the sqlcipher CLI
+
+`core/tests/differential_sqlcipher.rs`, env-gated on **`SIGNAL_SQLCIPHER_ORACLE`**
+(the path to a `sqlcipher` binary); it skips cleanly when the var is unset, so
+the committed gate never depends on the tool.
+
+The test mints a SQLCipher database (built with the reader's own bundled
+SQLCipher, in Signal's documented `messages`/`conversations` schema, encrypted
+with a known raw key), then decrypts and reads it **two independent ways**:
+
+1. **Our reader** — `SignalStore::open_at` → `messages()` / `conversations()`.
+2. **The `sqlcipher` CLI** — a separate process that sets the same
+   `PRAGMA key = "x'…'"` and `SELECT`s the rows in `.mode json`.
+
+It reconciles both directions: equal **counts**, and equal **contents** per row
+(`id`, `conversationId`, `sent_at`, `received_at`, `type`, `body` for messages;
+`id`, `type`, `active_at` for conversations). Any divergence fails loud with the
+mismatched rows.
+
+**Independence, stated honestly.** This is **tier-2**: we authored the fixture
+and its rows, so it is not tier-1 (no independent party wrote both the artifact
+and the answer key). What is genuinely independent is the **oracle**: the
+`sqlcipher` CLI is a distinct SQLCipher build in a separate process. Two things
+follow. (a) It independently reads the SQL rows, so agreement validates our
+**SQL-layer read** (column selection, row→record mapping) against an outside
+implementation rather than only against our own bundled library. (b) Because the
+CLI links its own SQLCipher + OpenSSL, its ability to decrypt the DB our library
+wrote also cross-checks that we produced a **spec-compliant SQLCipher-4
+database** a different implementation can open — a real, if bounded, decrypt
+cross-check. What it does **not** establish is real-world message-corpus
+fidelity (the rows are ours, not a third party's) — that remains the T1 upgrade
+below.
+
+Run it:
+
+```sh
+SIGNAL_SQLCIPHER_ORACLE=$(command -v sqlcipher) \
+  cargo test -p signal-desktop-core --test differential_sqlcipher -- --nocapture
+```
+
+Latest run: **3 messages + 2 conversations reconciled**, oracle
+`sqlcipher 3.53.3 (SQLCipher 4.17.0 community)`.
 
 ## Robustness (fuzzing) — measured
 
