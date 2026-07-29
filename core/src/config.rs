@@ -133,4 +133,25 @@ mod tests {
             Err(SignalError::ConfigJson(_))
         ));
     }
+
+    #[test]
+    fn from_profile_reads_config_json() {
+        let dir = tempfile::tempdir().unwrap();
+        // config_relpath() is "config.json" (from the KNOWLEDGE leaf).
+        std::fs::write(dir.path().join("config.json"), MODERN).unwrap();
+        let c = SignalConfig::from_profile(dir.path()).unwrap();
+        assert!(c.has_key());
+        assert_eq!(&c.encrypted_key.unwrap()[..3], b"v10");
+    }
+
+    #[test]
+    fn from_profile_missing_file_is_loud() {
+        // An empty profile dir (no config.json) is a loud ConfigRead, never a
+        // silent empty config.
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            SignalConfig::from_profile(dir.path()),
+            Err(SignalError::ConfigRead { .. })
+        ));
+    }
 }

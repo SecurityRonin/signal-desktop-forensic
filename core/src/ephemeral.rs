@@ -114,4 +114,23 @@ mod tests {
             Err(SignalError::EphemeralJson(_))
         ));
     }
+
+    #[test]
+    fn from_profile_reads_ephemeral_json() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(EPHEMERAL_RELPATH), REAL_SHAPE).unwrap();
+        let e = EphemeralConfig::from_profile(dir.path()).unwrap();
+        assert_eq!(e.theme.as_deref(), Some("system"));
+    }
+
+    #[test]
+    fn from_profile_missing_file_is_loud() {
+        // A profile with no ephemeral.json is a loud ConfigRead, never a silent
+        // default.
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            EphemeralConfig::from_profile(dir.path()),
+            Err(SignalError::ConfigRead { .. })
+        ));
+    }
 }

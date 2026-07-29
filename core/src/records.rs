@@ -128,3 +128,41 @@ pub struct Attachment {
     /// Relative path under `attachments.noindex` (`path`), if recorded.
     pub path: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn direction_classifies_and_displays_all_arms() {
+        assert_eq!(Direction::from_type("incoming"), Direction::Incoming);
+        assert_eq!(Direction::from_type("outgoing"), Direction::Outgoing);
+        assert_eq!(
+            Direction::from_type("call-history"),
+            Direction::Other("call-history".to_owned())
+        );
+        // Display renders each arm, preserving an unrecognized value verbatim.
+        assert_eq!(Direction::Incoming.to_string(), "incoming");
+        assert_eq!(Direction::Outgoing.to_string(), "outgoing");
+        assert_eq!(
+            Direction::Other("call-history".to_owned()).to_string(),
+            "call-history"
+        );
+    }
+
+    #[test]
+    fn conversation_kind_classifies_all_arms() {
+        assert_eq!(
+            ConversationKind::from_type("private"),
+            ConversationKind::Private
+        );
+        assert_eq!(
+            ConversationKind::from_type("group"),
+            ConversationKind::Group
+        );
+        assert_eq!(
+            ConversationKind::from_type("note-to-self"),
+            ConversationKind::Other("note-to-self".to_owned())
+        );
+    }
+}

@@ -204,6 +204,20 @@ mod tests {
     }
 
     #[test]
+    fn non_utf8_plaintext_fails_loud() {
+        // A blob that decrypts with valid PKCS#7 padding but to NON-UTF-8 bytes
+        // (a wrong-but-valid-padding OS key result). from_utf8 must fail loud —
+        // never proceed with a guessed key.
+        let non_utf8: [u8; 4] = [0xff, 0xfe, 0x80, 0x81];
+        let blob = mint_v10(&KEY16, &non_utf8);
+        let cfg = config_with_encrypted(blob);
+        assert!(matches!(
+            unwrap_sqlcipher_key(&RecoveredKey::Aes128Cbc(KEY16), &cfg),
+            Err(SignalError::BadSqlcipherKeyLength { len: 4 })
+        ));
+    }
+
+    #[test]
     fn no_key_at_all_fails_loud() {
         let cfg = SignalConfig {
             encrypted_key: None,

@@ -221,4 +221,67 @@ mod tests {
         let messages = vec![msg("m1", Some("c1"))];
         assert!(audit(&conversations, &messages, &[]).is_empty());
     }
+
+    /// Mint a real SQLCipher `db.sqlite` in Signal's schema, encrypted with a
+    /// known raw key, carrying one orphan message (references a missing
+    /// conversation) and one attachment with an on-disk path (residue).
+    fn mint_db(path: &std::path::Path, key_hex: &str) {
+        use rusqlite::{params, Connection};
+        let conn = Connection::open(path).unwrap();
+        conn.execute_batch(&format!("PRAGMA key = \"x'{key_hex}'\";"))
+            .unwrap();
+        conn.execute_batch(
+            "CREATE TABLE conversations (id TEXT PRIMARY KEY, type TEXT, active_at INTEGER, json TEXT);
+             CREATE TABLE messages (id TEXT PRIMARY KEY, conversationId TEXT, sent_at INTEGER, received_at INTEGER, type TEXT, body TEXT, json TEXT);",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversations (id, type, active_at, json) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                "conv-alice",
+                "private",
+                1_700_000_000_000i64,
+                r#"{"id":"conv-alice"}"#
+            ],
+        )
+        .unwrap();
+        // Orphan: references conv-deleted, which has no conversations row.
+        conn.execute(
+            "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![
+                "msg-orphan", "conv-deleted", 1_700_000_100_000i64, 1_700_000_100_010i64,
+                "incoming", "still here", r#"{"id":"msg-orphan","attachments":[]}"#
+            ],
+        )
+        .unwrap();
+        // Attachment residue: a path under attachments.noindex.
+        conn.execute(
+            "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![
+                "msg-att", "conv-alice", 1_700_000_200_000i64, 1_700_000_200_010i64,
+                "outgoing", "photo", r#"{"id":"msg-att","attachments":[{"contentType":"image/jpeg","path":"ab/abcdef"}]}"#
+            ],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn audit_store_grades_a_decrypted_db() {
+        use signal_desktop_core::{SignalStore, SqlcipherKey};
+        const KEY_HEX: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("db.sqlite");
+        mint_db(&db, KEY_HEX);
+
+        let key = SqlcipherKey::from_hex(KEY_HEX).unwrap();
+        let store = SignalStore::open_at(&db, &key).unwrap();
+        let findings = audit_store(&store).unwrap();
+
+        assert!(findings.iter().any(|f| f.code == "SIGNAL-ORPHAN-MESSAGE"
+            && f.note.contains("msg-orphan")
+            && f.note.contains("conv-deleted")));
+        assert!(findings
+            .iter()
+            .any(|f| f.code == "SIGNAL-ATTACHMENT-RESIDUE" && f.note.contains("ab/abcdef")));
+    }
 }

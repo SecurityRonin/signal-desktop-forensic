@@ -454,6 +454,28 @@ mod tests {
     }
 
     #[test]
+    fn open_profile_resolves_db_from_the_knowledge_leaf() {
+        // messages_db_relpath() is "sql/db.sqlite": mint under that subdir and
+        // open by profile root, exercising the leaf-sourced path resolution.
+        let dir = tempfile::tempdir().unwrap();
+        let sql = dir.path().join("sql");
+        std::fs::create_dir_all(&sql).unwrap();
+        mint_signal_db(&sql.join("db.sqlite"));
+        let store = SignalStore::open_profile(dir.path(), &fixture_key()).unwrap();
+        assert_eq!(store.conversations().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn open_profile_missing_db_fails_loud() {
+        // A profile with no sql/db.sqlite is a loud DbOpen, never an empty store.
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            SignalStore::open_profile(dir.path(), &fixture_key()),
+            Err(SignalError::DbOpen(_))
+        ));
+    }
+
+    #[test]
     fn parse_attachments_tolerates_garbage() {
         // A malformed json column must never panic — it yields no attachments.
         assert!(parse_attachments_json("m", "not json").is_empty());
