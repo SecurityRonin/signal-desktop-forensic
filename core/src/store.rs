@@ -167,8 +167,8 @@ impl SignalStore {
                 body,
                 sent_at,
                 received_at,
-                received_at_ms,
-                server_timestamp,
+                received_at_ms: ts(received_at_ms, v.as_ref(), "received_at_ms"),
+                server_timestamp: ts(server_timestamp, v.as_ref(), "serverTimestamp"),
                 is_view_once: flag(view_once_col, v.as_ref(), "isViewOnce"),
                 is_erased: flag(erased_col, v.as_ref(), "isErased"),
                 source_service_id,
@@ -387,6 +387,23 @@ fn flag(column: Option<i64>, json: Option<&Value>, key: &str) -> Option<bool> {
         return Some(v != 0);
     }
     json?.get(key)?.as_bool()
+}
+
+/// A wall-clock timestamp: the denormalized column when this revision has it,
+/// else the same value from the message `json`.
+///
+/// The json is not a fallback of last resort — it is where every pre-2025 profile
+/// actually keeps these times. Signal-Desktop migration 1270
+/// (`1270-normalize-messages.std.ts`) *adds* `received_at_ms`/`serverTimestamp` as
+/// columns and backfills them with `json_extract(json, '$.received_at_ms')` /
+/// `'$.serverTimestamp'`, so on any earlier revision the column is absent and the
+/// json is the only home. Reading the column alone drops the time to `None` and
+/// publishes 0 into a timeline. Mirrors [`flag`].
+fn ts(column: Option<i64>, json: Option<&Value>, key: &str) -> Option<i64> {
+    if let Some(v) = column {
+        return Some(v);
+    }
+    json?.get(key)?.as_i64()
 }
 
 /// First present string among several candidate keys (schema drift tolerance).
@@ -678,10 +695,9 @@ pub(crate) mod testsupport {
 #[cfg(test)]
 mod tests {
     use super::testsupport::{
-        add_message_attachments_table, add_migrated_attachment_row, add_receive_only_messages,
-        add_legacy_json_timestamp_message, add_view_once_and_erased_messages, fixture_key,
-        mint_legacy_signal_db, mint_signal_db,
-        FIXTURE_KEY_HEX,
+        add_legacy_json_timestamp_message, add_message_attachments_table,
+        add_migrated_attachment_row, add_receive_only_messages, add_view_once_and_erased_messages,
+        fixture_key, mint_legacy_signal_db, mint_signal_db, FIXTURE_KEY_HEX,
     };
     use super::*;
     use crate::keys::SqlcipherKey;

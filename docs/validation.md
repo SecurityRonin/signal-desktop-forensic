@@ -113,13 +113,29 @@ Our reader previously took `sent_at`, else `received_at` — so a row with no
 `sent_at` published the counter as an epoch (a ~1970 timestamp in a forensic
 timeline). The minted fixture had concealed it by writing an epoch into
 `received_at`; it now carries small counters there and the epoch in
-`received_at_ms`, which is what a real profile looks like. The reader's
-preference is `sent_at` → `received_at_ms` → `serverTimestamp` → none, and
-`received_at` is retained and documented as the ordering value it is (useful as
-a stable-ordering tiebreak, never as a time). A schema revision lacking
-`received_at_ms`/`serverTimestamp` still reads (the columns are probed via
-`PRAGMA table_info` and projected as `NULL` when absent) and such a row simply
-has no timestamp — it never degrades to the counter.
+`received_at_ms`. Note the fixture's counters are *deliberately* small so a
+confusion of the two columns is unmissable — that is **not** what a real profile
+looks like: Signal seeds `receivedAtCounter` from `Date.now()` and then
+increments, so a real `received_at` is an epoch-magnitude integer. The practical
+consequence is that on real data the pre-fix defect published a
+**plausible-but-wrong** time rather than an obvious 1970 — the more insidious
+failure, and the reason the column identity matters more than the magnitude.
+
+The reader's preference is `sent_at` → `received_at_ms` → `serverTimestamp` →
+none, and `received_at` is retained and documented as the ordering value it is
+(useful as a stable-ordering tiebreak, never as a time).
+
+**Legacy revisions keep these times in the `json`, and they are read.** A schema
+predating the columns still reads (they are probed via `PRAGMA table_info` and
+projected as `NULL` when absent), and the wall-clock time is then taken from the
+message `json` (`$.received_at_ms`, `$.serverTimestamp`) — the same
+column-else-json rule the `isViewOnce`/`isErased` flags use. This is not a
+courtesy fallback: Signal-Desktop migration 1270
+(`1270-normalize-messages.std.ts`) *adds* those columns and backfills them with
+`json_extract(json, '$.received_at_ms')`, which is only possible because every
+earlier revision stored them in the json — so for any 2021–2025 profile the json
+is the sole home of the receive time. A row with no wall-clock datum in either
+place has no timestamp; it never degrades to the counter.
 
 ## Robustness (fuzzing) — measured
 
