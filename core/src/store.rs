@@ -425,6 +425,44 @@ pub(crate) mod testsupport {
         .expect("insert receive-only messages");
     }
 
+    /// Add the modern **`message_attachments`** table to an already-minted
+    /// fixture, plus the message it belongs to (`msg-modern-att`).
+    ///
+    /// Current Signal Desktop moved attachment metadata out of the message
+    /// `json` and into this dedicated table, so the new message's `json` carries
+    /// no `attachments` array at all — the shape a present-day profile has. The
+    /// row's body is NULL, as Signal records for an attachment-only message.
+    pub(crate) fn add_message_attachments_table(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("reopen minted db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, received_at_ms, type, body, json)
+             VALUES ('msg-modern-att', 'conv-alice', 1700000700000, 4, 1700000700020,
+                     'outgoing', NULL, '{\"id\":\"msg-modern-att\"}');
+             CREATE TABLE message_attachments (
+                 messageId TEXT,
+                 conversationId TEXT,
+                 orderInMessage INTEGER,
+                 attachmentType TEXT,
+                 contentType TEXT,
+                 path TEXT,
+                 size INTEGER,
+                 fileName TEXT,
+                 localKey TEXT,
+                 plaintextHash TEXT
+             );
+             INSERT INTO message_attachments
+                 (messageId, conversationId, orderInMessage, attachmentType, contentType,
+                  path, size, fileName, localKey, plaintextHash)
+             VALUES ('msg-modern-att', 'conv-alice', 0, 'attachment', 'image/png',
+                     'cd/cdef012345', 33000, 'screenshot.png', 'c2VjcmV0LWtleQ==',
+                     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');",
+        )
+        .expect("create message_attachments");
+    }
+
     /// Mint a **legacy-schema** `db.sqlite`: the `messages` table predates
     /// `received_at_ms` / `serverTimestamp`, so those columns do not exist at
     /// all. Carries one receive-only row (`msg-legacy-recv`) whose only receive
@@ -466,8 +504,8 @@ pub(crate) mod testsupport {
 #[cfg(test)]
 mod tests {
     use super::testsupport::{
-        add_receive_only_messages, fixture_key, mint_legacy_signal_db, mint_signal_db,
-        FIXTURE_KEY_HEX,
+        add_message_attachments_table, add_receive_only_messages, fixture_key,
+        mint_legacy_signal_db, mint_signal_db, FIXTURE_KEY_HEX,
     };
     use super::*;
     use crate::keys::SqlcipherKey;
@@ -751,6 +789,58 @@ mod tests {
             "with no wall-clock column present the timestamp is absent (0), \
              never the received_at ordering counter (7)"
         );
+    }
+
+    #[test]
+    fn reads_attachments_from_the_message_attachments_table() {
+        // Current Signal Desktop keeps attachment metadata in a dedicated
+        // `message_attachments` table, not in the message `json`. Reading only
+        // the legacy `json.attachments[]` returns nothing for such a message —
+        // the attachment evidence goes missing on a present-day profile.
+        let (_dir, db) = minted();
+        add_message_attachments_table(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+
+        let atts = store.attachments().unwrap();
+        let modern = atts
+            .iter()
+            .find(|a| a.message_id == "msg-modern-att")
+            .expect("attachment from the message_attachments table");
+        assert_eq!(modern.content_type.as_deref(), Some("image/png"));
+        assert_eq!(modern.file_name.as_deref(), Some("screenshot.png"));
+        assert_eq!(modern.size, Some(33_000));
+        assert_eq!(modern.path.as_deref(), Some("cd/cdef012345"));
+
+        // The legacy json-carried attachment is still read — a profile mid-way
+        // through the migration keeps evidence in both places.
+        assert!(atts.iter().any(|a| a.message_id == "msg-2"));
+        assert_eq!(atts.len(), 2);
+    }
+
+    #[test]
+    fn a_table_only_attachment_still_marks_its_message_and_timeline_entry() {
+        let (_dir, db) = minted();
+        add_message_attachments_table(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+
+        let msgs = store.messages().unwrap();
+        let m = msgs
+            .iter()
+            .find(|m| m.id == "msg-modern-att")
+            .expect("modern attachment message");
+        assert!(
+            m.has_attachments,
+            "a message whose attachments live only in message_attachments still has attachments"
+        );
+
+        // The row has no body, so the summary is the attachment placeholder —
+        // "[no body]" would read as an empty message that carried nothing.
+        let tl = store.timeline().unwrap();
+        let e = tl
+            .iter()
+            .find(|e| e.message_id == "msg-modern-att")
+            .expect("modern attachment entry");
+        assert_eq!(e.summary, "[attachment]");
     }
 
     #[test]

@@ -65,6 +65,14 @@ the DB is generated per test run.
     `msg-server-only` (`sent_at` NULL, `received_at` counter 43, `received_at_ms`
     NULL, `serverTimestamp` 1700001000000): the rows whose time can only come from a
     wall-clock column.
+  - `testsupport::add_message_attachments_table(db)` — appends `msg-modern-att`
+    (`sent_at` 1700000700000, counter 4, `received_at_ms` 1700000700020, body NULL,
+    `json` with **no** `attachments` array) plus the modern
+    **`message_attachments`** table holding its one row (`orderInMessage` 0,
+    `image/png`, path `cd/cdef012345`, 33000 bytes, `screenshot.png`, synthetic
+    `localKey` `c2VjcmV0LWtleQ==`, `plaintextHash`
+    `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`): the
+    present-day shape, where attachment metadata is no longer in the message json.
   - `testsupport::mint_legacy_signal_db(db)` — a legacy revision whose `messages`
     table has **no** `received_at_ms`/`serverTimestamp` column, carrying
     `msg-legacy-sent` (`sent_at` 1700000100000, counter 6) and `msg-legacy-recv`
