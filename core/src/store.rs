@@ -269,6 +269,8 @@ pub(crate) mod testsupport {
                  conversationId TEXT,
                  sent_at INTEGER,
                  received_at INTEGER,
+                 received_at_ms INTEGER,
+                 serverTimestamp INTEGER,
                  type TEXT,
                  body TEXT,
                  json TEXT
@@ -298,11 +300,17 @@ pub(crate) mod testsupport {
             .expect("insert conversation");
         }
 
+        // Realistic column semantics: `received_at` is Signal's monotonically
+        // increasing ORDERING COUNTER (small integers), while `received_at_ms`
+        // carries the wall-clock receive time in Unix ms. Writing an epoch into
+        // `received_at` would conceal a reader that mistakes the counter for a
+        // time (circular validation).
         let messages = [
             (
                 "msg-1",
                 "conv-alice",
                 1_700_000_100_000i64,
+                1i64,
                 1_700_000_100_050i64,
                 "incoming",
                 "hey there",
@@ -312,6 +320,7 @@ pub(crate) mod testsupport {
                 "msg-2",
                 "conv-alice",
                 1_700_000_200_000,
+                2,
                 1_700_000_200_010,
                 "outgoing",
                 "photo!",
@@ -321,26 +330,89 @@ pub(crate) mod testsupport {
                 "msg-3",
                 "conv-team",
                 1_700_000_600_000,
+                3,
                 1_700_000_600_030,
                 "incoming",
                 "gm all",
                 r#"{"id":"msg-3","conversationId":"conv-team","sourceServiceId":"uuid-bob","attachments":[]}"#,
             ),
         ];
-        for (id, conv, sent, recv, typ, body, json) in messages {
+        for (id, conv, sent, recv_counter, recv_ms, typ, body, json) in messages {
             conn.execute(
-                "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![id, conv, sent, recv, typ, body, json],
+                "INSERT INTO messages
+                     (id, conversationId, sent_at, received_at, received_at_ms, type, body, json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![id, conv, sent, recv_counter, recv_ms, typ, body, json],
             )
             .expect("insert message");
         }
+    }
+
+    /// Add the two **receive-only** message shapes to an already-minted fixture:
+    /// rows with no `sent_at` at all, whose only wall-clock datum is
+    /// `received_at_ms` (`msg-recv-only`) or `serverTimestamp`
+    /// (`msg-server-only`). Both also carry a small `received_at` ordering
+    /// counter — the value a reader must never publish as a time.
+    pub(crate) fn add_receive_only_messages(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("reopen minted db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, received_at_ms, serverTimestamp,
+                  type, body, json)
+             VALUES ('msg-recv-only', 'conv-alice', NULL, 42, 1700000900000, NULL,
+                     'incoming', 'no sent_at', '{\"id\":\"msg-recv-only\"}'),
+                    ('msg-server-only', 'conv-alice', NULL, 43, NULL, 1700001000000,
+                     'incoming', 'server stamped only', '{\"id\":\"msg-server-only\"}');",
+        )
+        .expect("insert receive-only messages");
+    }
+
+    /// Mint a **legacy-schema** `db.sqlite`: the `messages` table predates
+    /// `received_at_ms` / `serverTimestamp`, so those columns do not exist at
+    /// all. Carries one receive-only row (`msg-legacy-recv`) whose only receive
+    /// datum is the `received_at` ordering counter.
+    pub(crate) fn mint_legacy_signal_db(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("open new db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "CREATE TABLE conversations (
+                 id TEXT PRIMARY KEY,
+                 type TEXT,
+                 active_at INTEGER,
+                 json TEXT
+             );
+             CREATE TABLE messages (
+                 id TEXT PRIMARY KEY,
+                 conversationId TEXT,
+                 sent_at INTEGER,
+                 received_at INTEGER,
+                 type TEXT,
+                 body TEXT,
+                 json TEXT
+             );
+             INSERT INTO conversations (id, type, active_at, json)
+                 VALUES ('conv-alice', 'private', 1700000000000,
+                         '{\"id\":\"conv-alice\",\"type\":\"private\"}');
+             INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, type, body, json)
+             VALUES ('msg-legacy-sent', 'conv-alice', 1700000100000, 6,
+                     'incoming', 'legacy sent', '{\"id\":\"msg-legacy-sent\"}'),
+                    ('msg-legacy-recv', 'conv-alice', NULL, 7,
+                     'incoming', 'legacy receive-only', '{\"id\":\"msg-legacy-recv\"}');",
+        )
+        .expect("create legacy schema");
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::testsupport::{fixture_key, mint_signal_db, FIXTURE_KEY_HEX};
+    use super::testsupport::{
+        add_receive_only_messages, fixture_key, mint_legacy_signal_db, mint_signal_db,
+        FIXTURE_KEY_HEX,
+    };
     use super::*;
     use crate::keys::SqlcipherKey;
 
@@ -545,6 +617,79 @@ mod tests {
         let atts = store.attachments().unwrap();
         assert_eq!(atts.len(), 1);
         assert_eq!(atts[0].message_id, "msg-2");
+    }
+
+    #[test]
+    fn timeline_time_comes_from_received_at_ms_not_the_ordering_counter() {
+        // In modern Signal Desktop `received_at` is a monotonically increasing
+        // ORDERING COUNTER; the wall-clock receive time lives in
+        // `received_at_ms` (and `serverTimestamp` for server-stamped rows).
+        // Publishing the counter as an epoch dates a message to 1970 in a
+        // forensic timeline — silent wrong output.
+        let (_dir, db) = minted();
+        add_receive_only_messages(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let tl = store.timeline().unwrap();
+
+        let recv_only = tl
+            .iter()
+            .find(|e| e.message_id == "msg-recv-only")
+            .expect("receive-only entry");
+        assert_eq!(
+            recv_only.timestamp, 1_700_000_900_000,
+            "a message with no sent_at must take its time from received_at_ms, \
+             not from the received_at ordering counter (42)"
+        );
+
+        let server_only = tl
+            .iter()
+            .find(|e| e.message_id == "msg-server-only")
+            .expect("server-stamped entry");
+        assert_eq!(
+            server_only.timestamp, 1_700_001_000_000,
+            "with no sent_at and no received_at_ms, the time must come from \
+             serverTimestamp, not from the received_at ordering counter (43)"
+        );
+
+        // Both are the newest activity in the fixture, so they must sort LAST.
+        // Reading the counter puts them first, at the epoch of 1970-01-01.
+        let ids: Vec<&str> = tl.iter().map(|e| e.message_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            [
+                "msg-1",
+                "msg-2",
+                "msg-3",
+                "msg-recv-only",
+                "msg-server-only"
+            ]
+        );
+    }
+
+    #[test]
+    fn legacy_schema_without_received_at_ms_reads_and_never_times_by_the_counter() {
+        // An older Signal revision has no `received_at_ms`/`serverTimestamp`
+        // column at all. A missing column must not fail the whole read (a legacy
+        // profile is still evidence) — and with no wall-clock datum the entry
+        // gets no timestamp rather than the ordering counter.
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("db.sqlite");
+        mint_legacy_signal_db(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+
+        let msgs = store.messages().unwrap();
+        assert_eq!(msgs.len(), 2, "a legacy schema must still read its rows");
+
+        let tl = store.timeline().unwrap();
+        let legacy_recv = tl
+            .iter()
+            .find(|e| e.message_id == "msg-legacy-recv")
+            .expect("legacy receive-only entry");
+        assert_eq!(
+            legacy_recv.timestamp, 0,
+            "with no wall-clock column present the timestamp is absent (0), \
+             never the received_at ordering counter (7)"
+        );
     }
 
     #[test]

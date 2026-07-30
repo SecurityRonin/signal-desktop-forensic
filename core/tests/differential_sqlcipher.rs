@@ -63,6 +63,8 @@ fn mint_signal_db(db_path: &Path) {
              conversationId TEXT,
              sent_at INTEGER,
              received_at INTEGER,
+             received_at_ms INTEGER,
+             serverTimestamp INTEGER,
              type TEXT,
              body TEXT,
              json TEXT
@@ -92,11 +94,14 @@ fn mint_signal_db(db_path: &Path) {
         .expect("insert conversation");
     }
 
+    // `received_at` is the ordering counter, `received_at_ms` the wall clock —
+    // mirroring the canonical builder's realistic column semantics.
     let messages = [
         (
             "msg-1",
             "conv-alice",
             1_700_000_100_000i64,
+            1i64,
             1_700_000_100_050i64,
             "incoming",
             "hey there",
@@ -106,6 +111,7 @@ fn mint_signal_db(db_path: &Path) {
             "msg-2",
             "conv-alice",
             1_700_000_200_000,
+            2,
             1_700_000_200_010,
             "outgoing",
             "photo!",
@@ -115,17 +121,19 @@ fn mint_signal_db(db_path: &Path) {
             "msg-3",
             "conv-team",
             1_700_000_600_000,
+            3,
             1_700_000_600_030,
             "incoming",
             "gm all",
             r#"{"id":"msg-3","conversationId":"conv-team","sourceServiceId":"uuid-bob","attachments":[]}"#,
         ),
     ];
-    for (id, conv, sent, recv, typ, body, json) in messages {
+    for (id, conv, sent, recv_counter, recv_ms, typ, body, json) in messages {
         conn.execute(
-            "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![id, conv, sent, recv, typ, body, json],
+            "INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, received_at_ms, type, body, json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![id, conv, sent, recv_counter, recv_ms, typ, body, json],
         )
         .expect("insert message");
     }

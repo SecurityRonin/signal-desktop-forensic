@@ -53,6 +53,22 @@ the DB is generated per test run.
   (`sent_at` 1700000100000), `msg-2` outgoing `photo!` (`sent_at` 1700000200000) with
   one `image/jpeg` attachment (`pic.jpg`, 20480 bytes, path `ab/abcdef0123`), and
   `msg-3` incoming `gm all` in the group (`sent_at` 1700000600000).
+- **Column semantics the fixture reproduces (load-bearing):** `received_at` holds a
+  small monotonically increasing **ordering counter** (1, 2, 3), and the wall-clock
+  receive time is in **`received_at_ms`** (1700000100050, 1700000200010,
+  1700000600030) — Signal Desktop's real semantics. An epoch written into
+  `received_at` would let a reader that mistakes the counter for a time pass
+  (circular validation), so the fixture keeps the two distinct.
+- **Extra shapes minted by the sibling builders in `core/src/store.rs`:**
+  - `testsupport::add_receive_only_messages(db)` — appends `msg-recv-only`
+    (`sent_at` NULL, `received_at` counter 42, `received_at_ms` 1700000900000) and
+    `msg-server-only` (`sent_at` NULL, `received_at` counter 43, `received_at_ms`
+    NULL, `serverTimestamp` 1700001000000): the rows whose time can only come from a
+    wall-clock column.
+  - `testsupport::mint_legacy_signal_db(db)` — a legacy revision whose `messages`
+    table has **no** `received_at_ms`/`serverTimestamp` column, carrying
+    `msg-legacy-sent` (`sent_at` 1700000100000, counter 6) and `msg-legacy-recv`
+    (`sent_at` NULL, counter 7): the graceful-degradation path.
 - **Classification:** SYNTHETIC (`✓` — generator committed in-repo).
 - **Use case:** structural validation of `Conversation` / `Message` / `Contact`
   / `Attachment` / timeline parsing, and the wrong-key-fails-loud paths.
