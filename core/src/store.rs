@@ -463,6 +463,25 @@ pub(crate) mod testsupport {
         .expect("create message_attachments");
     }
 
+    /// Give `msg-2` — which already carries a legacy `json.attachments[]` entry
+    /// (`ab/abcdef0123`) — a `message_attachments` row too, as a profile part-way
+    /// through Signal's migration has. Requires
+    /// [`add_message_attachments_table`] to have created the table.
+    pub(crate) fn add_migrated_attachment_row(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("reopen minted db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO message_attachments
+                 (messageId, conversationId, orderInMessage, attachmentType, contentType,
+                  path, size, fileName, localKey, plaintextHash)
+             VALUES ('msg-2', 'conv-alice', 0, 'attachment', 'image/jpeg',
+                     'ef/ef0123456789', 20480, 'pic.jpg', 'YW5vdGhlci1rZXk=',
+                     'da39a3ee5e6b4b0d3255bfef95601890afd80709');",
+        )
+        .expect("insert migrated attachment row");
+    }
+
     /// Mint a **legacy-schema** `db.sqlite`: the `messages` table predates
     /// `received_at_ms` / `serverTimestamp`, so those columns do not exist at
     /// all. Carries one receive-only row (`msg-legacy-recv`) whose only receive
@@ -504,8 +523,8 @@ pub(crate) mod testsupport {
 #[cfg(test)]
 mod tests {
     use super::testsupport::{
-        add_message_attachments_table, add_receive_only_messages, fixture_key,
-        mint_legacy_signal_db, mint_signal_db, FIXTURE_KEY_HEX,
+        add_message_attachments_table, add_migrated_attachment_row, add_receive_only_messages,
+        fixture_key, mint_legacy_signal_db, mint_signal_db, FIXTURE_KEY_HEX,
     };
     use super::*;
     use crate::keys::SqlcipherKey;
@@ -841,6 +860,24 @@ mod tests {
             .find(|e| e.message_id == "msg-modern-att")
             .expect("modern attachment entry");
         assert_eq!(e.summary, "[attachment]");
+    }
+
+    #[test]
+    fn a_migrated_message_is_not_counted_twice() {
+        // A profile part-way through Signal's migration holds the same
+        // attachment in both places. The table is the current record, so the
+        // message yields ONE attachment from it — not two, which would inflate
+        // an attachment count in a report.
+        let (_dir, db) = minted();
+        add_message_attachments_table(&db);
+        add_migrated_attachment_row(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+
+        let atts = store.attachments().unwrap();
+        let for_msg2: Vec<_> = atts.iter().filter(|a| a.message_id == "msg-2").collect();
+        assert_eq!(for_msg2.len(), 1, "the migrated attachment is not doubled");
+        assert_eq!(for_msg2[0].path.as_deref(), Some("ef/ef0123456789"));
+        assert_eq!(atts.len(), 2);
     }
 
     #[test]
