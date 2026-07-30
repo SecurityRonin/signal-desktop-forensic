@@ -1020,31 +1020,18 @@ mod tests {
         add_view_once_and_erased_messages(&db);
         let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
         let msgs = store.messages().unwrap();
-        let by_id = |id: &str| {
-            msgs.iter()
-                .find(|m| m.id == id)
-                .unwrap_or_else(|| panic!("message {id}"))
-                .clone()
-        };
+        let flags: Vec<(&str, Option<bool>, Option<bool>)> = msgs
+            .iter()
+            .map(|m| (m.id.as_str(), m.is_view_once, m.is_erased))
+            .collect();
 
-        let view_once = by_id("msg-viewonce");
-        assert_eq!(view_once.is_view_once, Some(true));
-        assert_eq!(view_once.is_erased, Some(false));
-
-        let erased = by_id("msg-erased");
-        assert_eq!(erased.is_view_once, Some(false));
-        assert_eq!(erased.is_erased, Some(true));
-
+        assert!(flags.contains(&("msg-viewonce", Some(true), Some(false))));
+        assert!(flags.contains(&("msg-erased", Some(false), Some(true))));
         // An older revision records the flag only in the message json.
-        let json_erased = by_id("msg-json-erased");
-        assert_eq!(json_erased.is_erased, Some(true));
-        assert_eq!(json_erased.is_view_once, None);
-
+        assert!(flags.contains(&("msg-json-erased", None, Some(true))));
         // A row that records nothing either way stays unrecorded — reporting
         // `false` would state a fact the profile does not carry.
-        let plain = by_id("msg-1");
-        assert_eq!(plain.is_view_once, None);
-        assert_eq!(plain.is_erased, None);
+        assert!(flags.contains(&("msg-1", None, None)));
     }
 
     #[test]
