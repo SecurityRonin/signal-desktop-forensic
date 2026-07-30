@@ -171,6 +171,8 @@ mod tests {
             received_at: Some(1),
             received_at_ms: None,
             server_timestamp: None,
+            is_view_once: None,
+            is_erased: None,
             source_service_id: None,
             has_attachments: false,
         }
@@ -207,6 +209,7 @@ mod tests {
             file_name: Some("pic.jpg".to_owned()),
             size: Some(1),
             path: Some("ab/cd".to_owned()),
+            plaintext_hash: None,
         };
         let findings = audit(&[], &[], &[att]);
         let res = findings
@@ -238,6 +241,7 @@ mod tests {
             file_name: Some("pic.jpg".to_owned()),
             size: Some(1),
             path: None,
+            plaintext_hash: None,
         };
         assert!(audit(&[], &[], &[att]).is_empty());
     }

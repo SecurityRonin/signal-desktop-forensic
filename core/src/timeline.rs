@@ -81,6 +81,8 @@ mod tests {
             received_at: Some(9),
             received_at_ms: recv_ms,
             server_timestamp: None,
+            is_view_once: None,
+            is_erased: None,
             source_service_id: None,
             has_attachments: false,
         }

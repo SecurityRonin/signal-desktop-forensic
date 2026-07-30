@@ -127,6 +127,8 @@ impl SignalStore {
                     row.get::<_, Option<String>>(6)?,
                     row.get::<_, Option<i64>>(7)?,
                     row.get::<_, Option<i64>>(8)?,
+                    row.get::<_, Option<i64>>(9)?,
+                    row.get::<_, Option<i64>>(10)?,
                 ))
             })
             .map_err(SignalError::Query)?;
@@ -143,6 +145,8 @@ impl SignalStore {
                 json,
                 received_at_ms,
                 server_timestamp,
+                view_once_col,
+                erased_col,
             ) = row.map_err(SignalError::Query)?;
             let v: Option<Value> = json.as_deref().and_then(|s| serde_json::from_str(s).ok());
             let direction = Direction::from_type(typ.as_deref().unwrap_or_default());
@@ -165,6 +169,8 @@ impl SignalStore {
                 received_at,
                 received_at_ms,
                 server_timestamp,
+                is_view_once: flag(view_once_col, v.as_ref(), "isViewOnce"),
+                is_erased: flag(erased_col, v.as_ref(), "isErased"),
                 source_service_id,
                 has_attachments,
             });
@@ -227,6 +233,7 @@ impl SignalStore {
                     path: row.get::<_, Option<String>>(2)?,
                     size: row.get::<_, Option<i64>>(3)?,
                     file_name: row.get::<_, Option<String>>(4)?,
+                    plaintext_hash: row.get::<_, Option<String>>(5)?,
                 })
             })
             .map_err(SignalError::Query)?;
@@ -301,13 +308,20 @@ pub fn parse_attachments_json(message_id: &str, json: &str) -> Vec<Attachment> {
             file_name: str_field(a, "fileName"),
             size: a.get("size").and_then(Value::as_i64),
             path: str_field(a, "path"),
+            // The legacy json form records no plaintext hash.
+            plaintext_hash: None,
         })
         .collect()
 }
 
 /// `messages` columns that only exist on some Signal schema revisions, in the
 /// order they are appended to the projection.
-const OPTIONAL_MESSAGE_COLUMNS: [&str; 2] = ["received_at_ms", "serverTimestamp"];
+const OPTIONAL_MESSAGE_COLUMNS: [&str; 4] = [
+    "received_at_ms",
+    "serverTimestamp",
+    "isViewOnce",
+    "isErased",
+];
 
 /// The dedicated attachment table modern Signal Desktop moved attachment
 /// metadata into (it lived in the message `json` before).
@@ -315,7 +329,8 @@ const MESSAGE_ATTACHMENTS_TABLE: &str = "message_attachments";
 
 /// `message_attachments` columns, in projection order. Probed like the message
 /// ones so a revision that lacks one reads `None` instead of failing the query.
-const OPTIONAL_ATTACHMENT_COLUMNS: [&str; 4] = ["contentType", "path", "size", "fileName"];
+const OPTIONAL_ATTACHMENT_COLUMNS: [&str; 5] =
+    ["contentType", "path", "size", "fileName", "plaintextHash"];
 
 /// The column names a table actually has, from `PRAGMA table_info`.
 ///
@@ -359,6 +374,19 @@ fn optional_projection(present: &std::collections::HashSet<String>, wanted: &[&s
 /// Read a string field from a JSON object, if present and a string.
 fn str_field(v: &Value, key: &str) -> Option<String> {
     v.get(key)?.as_str().map(str::to_owned)
+}
+
+/// A boolean Signal flag that drifted between a column and the message `json`.
+///
+/// The column wins when this revision has it and the row records a value;
+/// otherwise the `json` is consulted, since older revisions kept the flag only
+/// there. Recorded nowhere stays `None` — reporting `false` would state
+/// something the profile does not say.
+fn flag(column: Option<i64>, json: Option<&Value>, key: &str) -> Option<bool> {
+    if let Some(v) = column {
+        return Some(v != 0);
+    }
+    json?.get(key)?.as_bool()
 }
 
 /// First present string among several candidate keys (schema drift tolerance).

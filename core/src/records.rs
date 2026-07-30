@@ -87,6 +87,14 @@ pub struct Message {
     /// Server-assigned timestamp (`serverTimestamp`, ms since the Unix epoch),
     /// if recorded — present on server-delivered messages.
     pub server_timestamp: Option<i64>,
+    /// `isViewOnce` — the message carried view-once media, which is why the body
+    /// may be empty. `None` when the profile records nothing either way (an
+    /// older revision without the column, and no flag in the `json`).
+    pub is_view_once: Option<bool>,
+    /// `isErased` — Signal erased this row's content in place (a
+    /// delete-for-everyone or a disappearing-message expiry), which is why the
+    /// body may be empty. `None` when unrecorded.
+    pub is_erased: Option<bool>,
     /// The sender's service id (`sourceServiceId`/`source`), if any.
     pub source_service_id: Option<String>,
     /// Whether the message carries attachment metadata.
@@ -142,6 +150,11 @@ pub struct Attachment {
     pub size: Option<i64>,
     /// Relative path under `attachments.noindex` (`path`), if recorded.
     pub path: Option<String>,
+    /// Hash of the **decrypted** attachment bytes (`plaintextHash`), if the
+    /// profile records one — it identifies the file content without decrypting
+    /// the blob. Only the `message_attachments` table carries it; the legacy
+    /// `json.attachments[]` form does not.
+    pub plaintext_hash: Option<String>,
 }
 
 #[cfg(test)]
