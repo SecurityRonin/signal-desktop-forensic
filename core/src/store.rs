@@ -105,6 +105,10 @@ impl SignalStore {
 
     /// All messages.
     pub fn messages(&self) -> Result<Vec<Message>> {
+        // Attachment metadata lives in `message_attachments` on a modern profile
+        // and in the message `json` on an older one: a message "has attachments"
+        // if either says so.
+        let with_table_attachments = self.message_ids_with_table_attachments()?;
         let present = table_columns(&self.conn, "messages")?;
         let sql = format!(
             "SELECT id, conversationId, sent_at, received_at, type, body, json, {} FROM messages",
@@ -142,7 +146,7 @@ impl SignalStore {
             ) = row.map_err(SignalError::Query)?;
             let v: Option<Value> = json.as_deref().and_then(|s| serde_json::from_str(s).ok());
             let direction = Direction::from_type(typ.as_deref().unwrap_or_default());
-            let (source_service_id, has_attachments) = match &v {
+            let (source_service_id, has_json_attachments) = match &v {
                 Some(v) => (
                     first_str(v, &["sourceServiceId", "source"]),
                     v.get("attachments")
@@ -151,6 +155,7 @@ impl SignalStore {
                 ),
                 None => (None, false),
             };
+            let has_attachments = has_json_attachments || with_table_attachments.contains(&id);
             out.push(Message {
                 id,
                 conversation_id,
@@ -167,9 +172,18 @@ impl SignalStore {
         Ok(out)
     }
 
-    /// Attachment metadata across all messages, parsed from each message's
-    /// `json.attachments[]`.
+    /// Attachment metadata across all messages.
+    ///
+    /// Current Signal Desktop keeps it in the dedicated `message_attachments`
+    /// table; older revisions kept it inside each message's
+    /// `json.attachments[]`. Both are read, because a profile part-way through
+    /// the migration holds evidence in both places — but per message the table
+    /// is the record, so a migrated attachment is reported once, not twice.
     pub fn attachments(&self) -> Result<Vec<Attachment>> {
+        let mut out = self.table_attachments()?;
+        let from_table: std::collections::HashSet<String> =
+            out.iter().map(|a| a.message_id.clone()).collect();
+
         let mut stmt = self
             .conn
             .prepare("SELECT id, json FROM messages")
@@ -180,12 +194,67 @@ impl SignalStore {
             })
             .map_err(SignalError::Query)?;
 
-        let mut out = Vec::new();
         for row in rows {
             let (id, json) = row.map_err(SignalError::Query)?;
+            if from_table.contains(&id) {
+                continue;
+            }
             if let Some(json) = json {
                 out.extend(parse_attachments_json(&id, &json));
             }
+        }
+        Ok(out)
+    }
+
+    /// Attachment metadata from the modern `message_attachments` table, or an
+    /// empty list on a revision that predates it.
+    fn table_attachments(&self) -> Result<Vec<Attachment>> {
+        let present = table_columns(&self.conn, MESSAGE_ATTACHMENTS_TABLE)?;
+        if present.is_empty() {
+            // No such table on this revision — the legacy json is the only home.
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "SELECT messageId, {} FROM {MESSAGE_ATTACHMENTS_TABLE} ORDER BY messageId",
+            optional_projection(&present, &OPTIONAL_ATTACHMENT_COLUMNS)
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(SignalError::Query)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(Attachment {
+                    message_id: row.get::<_, String>(0)?,
+                    content_type: row.get::<_, Option<String>>(1)?,
+                    path: row.get::<_, Option<String>>(2)?,
+                    size: row.get::<_, Option<i64>>(3)?,
+                    file_name: row.get::<_, Option<String>>(4)?,
+                })
+            })
+            .map_err(SignalError::Query)?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(SignalError::Query)?);
+        }
+        Ok(out)
+    }
+
+    /// The ids of messages that have at least one `message_attachments` row.
+    fn message_ids_with_table_attachments(&self) -> Result<std::collections::HashSet<String>> {
+        let mut out = std::collections::HashSet::new();
+        if table_columns(&self.conn, MESSAGE_ATTACHMENTS_TABLE)?.is_empty() {
+            return Ok(out);
+        }
+        let mut stmt = self
+            .conn
+            .prepare(&format!(
+                "SELECT DISTINCT messageId FROM {MESSAGE_ATTACHMENTS_TABLE}"
+            ))
+            .map_err(SignalError::Query)?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(SignalError::Query)?;
+        for row in rows {
+            out.insert(row.map_err(SignalError::Query)?);
         }
         Ok(out)
     }
@@ -239,6 +308,14 @@ pub fn parse_attachments_json(message_id: &str, json: &str) -> Vec<Attachment> {
 /// `messages` columns that only exist on some Signal schema revisions, in the
 /// order they are appended to the projection.
 const OPTIONAL_MESSAGE_COLUMNS: [&str; 2] = ["received_at_ms", "serverTimestamp"];
+
+/// The dedicated attachment table modern Signal Desktop moved attachment
+/// metadata into (it lived in the message `json` before).
+const MESSAGE_ATTACHMENTS_TABLE: &str = "message_attachments";
+
+/// `message_attachments` columns, in projection order. Probed like the message
+/// ones so a revision that lacks one reads `None` instead of failing the query.
+const OPTIONAL_ATTACHMENT_COLUMNS: [&str; 4] = ["contentType", "path", "size", "fileName"];
 
 /// The column names a table actually has, from `PRAGMA table_info`.
 ///
