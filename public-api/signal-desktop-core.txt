@@ -1,0 +1,231 @@
+pub mod signal_desktop_core
+pub use signal_desktop_core::RecoveredKey
+pub mod signal_desktop_core::config
+pub struct signal_desktop_core::config::SignalConfig
+pub signal_desktop_core::config::SignalConfig::encrypted_key: core::option::Option<alloc::vec::Vec<u8>>
+pub signal_desktop_core::config::SignalConfig::legacy_key_hex: core::option::Option<alloc::string::String>
+impl signal_desktop_core::config::SignalConfig
+pub fn signal_desktop_core::config::SignalConfig::from_bytes(&[u8]) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::config::SignalConfig::from_profile(&std::path::Path) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::config::SignalConfig::has_key(&self) -> bool
+pub mod signal_desktop_core::ephemeral
+pub struct signal_desktop_core::ephemeral::EphemeralConfig
+pub signal_desktop_core::ephemeral::EphemeralConfig::locale_override: core::option::Option<alloc::string::String>
+pub signal_desktop_core::ephemeral::EphemeralConfig::spell_check: core::option::Option<bool>
+pub signal_desktop_core::ephemeral::EphemeralConfig::theme: core::option::Option<alloc::string::String>
+pub signal_desktop_core::ephemeral::EphemeralConfig::window: core::option::Option<signal_desktop_core::ephemeral::WindowState>
+impl signal_desktop_core::ephemeral::EphemeralConfig
+pub fn signal_desktop_core::ephemeral::EphemeralConfig::from_bytes(&[u8]) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::ephemeral::EphemeralConfig::from_profile(&std::path::Path) -> signal_desktop_core::error::Result<Self>
+pub struct signal_desktop_core::ephemeral::WindowState
+pub signal_desktop_core::ephemeral::WindowState::fullscreen: core::option::Option<bool>
+pub signal_desktop_core::ephemeral::WindowState::height: core::option::Option<i64>
+pub signal_desktop_core::ephemeral::WindowState::maximized: core::option::Option<bool>
+pub signal_desktop_core::ephemeral::WindowState::width: core::option::Option<i64>
+pub signal_desktop_core::ephemeral::WindowState::x: core::option::Option<i64>
+pub signal_desktop_core::ephemeral::WindowState::y: core::option::Option<i64>
+pub const signal_desktop_core::ephemeral::EPHEMERAL_RELPATH: &str
+pub mod signal_desktop_core::error
+#[non_exhaustive] pub enum signal_desktop_core::error::SignalError
+pub signal_desktop_core::error::SignalError::BadSqlcipherKeyLength
+pub signal_desktop_core::error::SignalError::BadSqlcipherKeyLength::len: usize
+pub signal_desktop_core::error::SignalError::ConfigJson(serde_json::error::Error)
+pub signal_desktop_core::error::SignalError::ConfigKeyNotHex
+pub signal_desktop_core::error::SignalError::ConfigKeyNotHex::prefix: alloc::string::String
+pub signal_desktop_core::error::SignalError::ConfigRead
+pub signal_desktop_core::error::SignalError::ConfigRead::path: alloc::string::String
+pub signal_desktop_core::error::SignalError::ConfigRead::source: std::io::error::Error
+pub signal_desktop_core::error::SignalError::DbOpen(rusqlite::error::Error)
+pub signal_desktop_core::error::SignalError::EphemeralJson(serde_json::error::Error)
+pub signal_desktop_core::error::SignalError::KeyUnwrap(chromium_safestorage_core::error::SafeStorageError)
+pub signal_desktop_core::error::SignalError::NoKeyField
+pub signal_desktop_core::error::SignalError::Query(rusqlite::error::Error)
+pub type signal_desktop_core::error::Result<T> = core::result::Result<T, signal_desktop_core::error::SignalError>
+pub mod signal_desktop_core::keys
+pub struct signal_desktop_core::keys::SqlcipherKey
+impl signal_desktop_core::keys::SqlcipherKey
+pub fn signal_desktop_core::keys::SqlcipherKey::as_pragma(&self) -> alloc::string::String
+pub fn signal_desktop_core::keys::SqlcipherKey::from_hex(&str) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::keys::SqlcipherKey::hex(&self) -> &str
+impl core::fmt::Debug for signal_desktop_core::keys::SqlcipherKey
+pub fn signal_desktop_core::keys::SqlcipherKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn signal_desktop_core::keys::unwrap_sqlcipher_key(&chromium_safestorage_core::cookie::RecoveredKey, &signal_desktop_core::config::SignalConfig) -> signal_desktop_core::error::Result<signal_desktop_core::keys::SqlcipherKey>
+pub mod signal_desktop_core::paths
+pub const signal_desktop_core::paths::APP: &str
+pub fn signal_desktop_core::paths::attachments_relpath() -> core::option::Option<&'static str>
+pub fn signal_desktop_core::paths::config_relpath() -> core::option::Option<&'static str>
+pub fn signal_desktop_core::paths::messages_db_relpath() -> core::option::Option<&'static str>
+pub fn signal_desktop_core::paths::spec() -> core::option::Option<&'static forensicnomicon_core::messenger_desktop::MessengerSpec>
+pub mod signal_desktop_core::records
+pub enum signal_desktop_core::records::ConversationKind
+pub signal_desktop_core::records::ConversationKind::Group
+pub signal_desktop_core::records::ConversationKind::Other(alloc::string::String)
+pub signal_desktop_core::records::ConversationKind::Private
+impl signal_desktop_core::records::ConversationKind
+pub fn signal_desktop_core::records::ConversationKind::from_type(&str) -> Self
+pub enum signal_desktop_core::records::Direction
+pub signal_desktop_core::records::Direction::Incoming
+pub signal_desktop_core::records::Direction::Other(alloc::string::String)
+pub signal_desktop_core::records::Direction::Outgoing
+impl signal_desktop_core::records::Direction
+pub fn signal_desktop_core::records::Direction::from_type(&str) -> Self
+impl core::fmt::Display for signal_desktop_core::records::Direction
+pub fn signal_desktop_core::records::Direction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct signal_desktop_core::records::Attachment
+pub signal_desktop_core::records::Attachment::content_type: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Attachment::file_name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Attachment::message_id: alloc::string::String
+pub signal_desktop_core::records::Attachment::path: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Attachment::plaintext_hash: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Attachment::size: core::option::Option<i64>
+pub struct signal_desktop_core::records::Contact
+pub signal_desktop_core::records::Contact::conversation_id: alloc::string::String
+pub signal_desktop_core::records::Contact::e164: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Contact::name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Contact::service_id: core::option::Option<alloc::string::String>
+pub struct signal_desktop_core::records::Conversation
+pub signal_desktop_core::records::Conversation::active_at: core::option::Option<i64>
+pub signal_desktop_core::records::Conversation::e164: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Conversation::id: alloc::string::String
+pub signal_desktop_core::records::Conversation::kind: signal_desktop_core::records::ConversationKind
+pub signal_desktop_core::records::Conversation::name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Conversation::service_id: core::option::Option<alloc::string::String>
+pub struct signal_desktop_core::records::Message
+pub signal_desktop_core::records::Message::body: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Message::conversation_id: core::option::Option<alloc::string::String>
+pub signal_desktop_core::records::Message::direction: signal_desktop_core::records::Direction
+pub signal_desktop_core::records::Message::has_attachments: bool
+pub signal_desktop_core::records::Message::id: alloc::string::String
+pub signal_desktop_core::records::Message::is_erased: core::option::Option<bool>
+pub signal_desktop_core::records::Message::is_view_once: core::option::Option<bool>
+pub signal_desktop_core::records::Message::received_at: core::option::Option<i64>
+pub signal_desktop_core::records::Message::received_at_ms: core::option::Option<i64>
+pub signal_desktop_core::records::Message::sent_at: core::option::Option<i64>
+pub signal_desktop_core::records::Message::server_timestamp: core::option::Option<i64>
+pub signal_desktop_core::records::Message::source_service_id: core::option::Option<alloc::string::String>
+pub mod signal_desktop_core::store
+pub struct signal_desktop_core::store::SignalStore
+impl signal_desktop_core::store::SignalStore
+pub fn signal_desktop_core::store::SignalStore::attachments(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Attachment>>
+pub fn signal_desktop_core::store::SignalStore::contacts(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Contact>>
+pub fn signal_desktop_core::store::SignalStore::conversations(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Conversation>>
+pub fn signal_desktop_core::store::SignalStore::messages(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Message>>
+pub fn signal_desktop_core::store::SignalStore::open_at(&std::path::Path, &signal_desktop_core::keys::SqlcipherKey) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::store::SignalStore::open_profile(&std::path::Path, &signal_desktop_core::keys::SqlcipherKey) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::store::SignalStore::timeline(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::timeline::TimelineEntry>>
+pub fn signal_desktop_core::store::parse_attachments_json(&str, &str) -> alloc::vec::Vec<signal_desktop_core::records::Attachment>
+pub mod signal_desktop_core::timeline
+pub struct signal_desktop_core::timeline::TimelineEntry
+pub signal_desktop_core::timeline::TimelineEntry::conversation_id: core::option::Option<alloc::string::String>
+pub signal_desktop_core::timeline::TimelineEntry::direction: signal_desktop_core::records::Direction
+pub signal_desktop_core::timeline::TimelineEntry::message_id: alloc::string::String
+pub signal_desktop_core::timeline::TimelineEntry::summary: alloc::string::String
+pub signal_desktop_core::timeline::TimelineEntry::timestamp: i64
+pub fn signal_desktop_core::timeline::build_timeline(&[signal_desktop_core::records::Message]) -> alloc::vec::Vec<signal_desktop_core::timeline::TimelineEntry>
+pub enum signal_desktop_core::ConversationKind
+pub signal_desktop_core::ConversationKind::Group
+pub signal_desktop_core::ConversationKind::Other(alloc::string::String)
+pub signal_desktop_core::ConversationKind::Private
+impl signal_desktop_core::records::ConversationKind
+pub fn signal_desktop_core::records::ConversationKind::from_type(&str) -> Self
+pub enum signal_desktop_core::Direction
+pub signal_desktop_core::Direction::Incoming
+pub signal_desktop_core::Direction::Other(alloc::string::String)
+pub signal_desktop_core::Direction::Outgoing
+impl signal_desktop_core::records::Direction
+pub fn signal_desktop_core::records::Direction::from_type(&str) -> Self
+impl core::fmt::Display for signal_desktop_core::records::Direction
+pub fn signal_desktop_core::records::Direction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+#[non_exhaustive] pub enum signal_desktop_core::SignalError
+pub signal_desktop_core::SignalError::BadSqlcipherKeyLength
+pub signal_desktop_core::SignalError::BadSqlcipherKeyLength::len: usize
+pub signal_desktop_core::SignalError::ConfigJson(serde_json::error::Error)
+pub signal_desktop_core::SignalError::ConfigKeyNotHex
+pub signal_desktop_core::SignalError::ConfigKeyNotHex::prefix: alloc::string::String
+pub signal_desktop_core::SignalError::ConfigRead
+pub signal_desktop_core::SignalError::ConfigRead::path: alloc::string::String
+pub signal_desktop_core::SignalError::ConfigRead::source: std::io::error::Error
+pub signal_desktop_core::SignalError::DbOpen(rusqlite::error::Error)
+pub signal_desktop_core::SignalError::EphemeralJson(serde_json::error::Error)
+pub signal_desktop_core::SignalError::KeyUnwrap(chromium_safestorage_core::error::SafeStorageError)
+pub signal_desktop_core::SignalError::NoKeyField
+pub signal_desktop_core::SignalError::Query(rusqlite::error::Error)
+pub struct signal_desktop_core::Attachment
+pub signal_desktop_core::Attachment::content_type: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Attachment::file_name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Attachment::message_id: alloc::string::String
+pub signal_desktop_core::Attachment::path: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Attachment::plaintext_hash: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Attachment::size: core::option::Option<i64>
+pub struct signal_desktop_core::Contact
+pub signal_desktop_core::Contact::conversation_id: alloc::string::String
+pub signal_desktop_core::Contact::e164: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Contact::name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Contact::service_id: core::option::Option<alloc::string::String>
+pub struct signal_desktop_core::Conversation
+pub signal_desktop_core::Conversation::active_at: core::option::Option<i64>
+pub signal_desktop_core::Conversation::e164: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Conversation::id: alloc::string::String
+pub signal_desktop_core::Conversation::kind: signal_desktop_core::records::ConversationKind
+pub signal_desktop_core::Conversation::name: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Conversation::service_id: core::option::Option<alloc::string::String>
+pub struct signal_desktop_core::EphemeralConfig
+pub signal_desktop_core::EphemeralConfig::locale_override: core::option::Option<alloc::string::String>
+pub signal_desktop_core::EphemeralConfig::spell_check: core::option::Option<bool>
+pub signal_desktop_core::EphemeralConfig::theme: core::option::Option<alloc::string::String>
+pub signal_desktop_core::EphemeralConfig::window: core::option::Option<signal_desktop_core::ephemeral::WindowState>
+impl signal_desktop_core::ephemeral::EphemeralConfig
+pub fn signal_desktop_core::ephemeral::EphemeralConfig::from_bytes(&[u8]) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::ephemeral::EphemeralConfig::from_profile(&std::path::Path) -> signal_desktop_core::error::Result<Self>
+pub struct signal_desktop_core::Message
+pub signal_desktop_core::Message::body: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Message::conversation_id: core::option::Option<alloc::string::String>
+pub signal_desktop_core::Message::direction: signal_desktop_core::records::Direction
+pub signal_desktop_core::Message::has_attachments: bool
+pub signal_desktop_core::Message::id: alloc::string::String
+pub signal_desktop_core::Message::is_erased: core::option::Option<bool>
+pub signal_desktop_core::Message::is_view_once: core::option::Option<bool>
+pub signal_desktop_core::Message::received_at: core::option::Option<i64>
+pub signal_desktop_core::Message::received_at_ms: core::option::Option<i64>
+pub signal_desktop_core::Message::sent_at: core::option::Option<i64>
+pub signal_desktop_core::Message::server_timestamp: core::option::Option<i64>
+pub signal_desktop_core::Message::source_service_id: core::option::Option<alloc::string::String>
+pub struct signal_desktop_core::SignalConfig
+pub signal_desktop_core::SignalConfig::encrypted_key: core::option::Option<alloc::vec::Vec<u8>>
+pub signal_desktop_core::SignalConfig::legacy_key_hex: core::option::Option<alloc::string::String>
+impl signal_desktop_core::config::SignalConfig
+pub fn signal_desktop_core::config::SignalConfig::from_bytes(&[u8]) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::config::SignalConfig::from_profile(&std::path::Path) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::config::SignalConfig::has_key(&self) -> bool
+pub struct signal_desktop_core::SignalStore
+impl signal_desktop_core::store::SignalStore
+pub fn signal_desktop_core::store::SignalStore::attachments(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Attachment>>
+pub fn signal_desktop_core::store::SignalStore::contacts(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Contact>>
+pub fn signal_desktop_core::store::SignalStore::conversations(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Conversation>>
+pub fn signal_desktop_core::store::SignalStore::messages(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::records::Message>>
+pub fn signal_desktop_core::store::SignalStore::open_at(&std::path::Path, &signal_desktop_core::keys::SqlcipherKey) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::store::SignalStore::open_profile(&std::path::Path, &signal_desktop_core::keys::SqlcipherKey) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::store::SignalStore::timeline(&self) -> signal_desktop_core::error::Result<alloc::vec::Vec<signal_desktop_core::timeline::TimelineEntry>>
+pub struct signal_desktop_core::SqlcipherKey
+impl signal_desktop_core::keys::SqlcipherKey
+pub fn signal_desktop_core::keys::SqlcipherKey::as_pragma(&self) -> alloc::string::String
+pub fn signal_desktop_core::keys::SqlcipherKey::from_hex(&str) -> signal_desktop_core::error::Result<Self>
+pub fn signal_desktop_core::keys::SqlcipherKey::hex(&self) -> &str
+impl core::fmt::Debug for signal_desktop_core::keys::SqlcipherKey
+pub fn signal_desktop_core::keys::SqlcipherKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct signal_desktop_core::TimelineEntry
+pub signal_desktop_core::TimelineEntry::conversation_id: core::option::Option<alloc::string::String>
+pub signal_desktop_core::TimelineEntry::direction: signal_desktop_core::records::Direction
+pub signal_desktop_core::TimelineEntry::message_id: alloc::string::String
+pub signal_desktop_core::TimelineEntry::summary: alloc::string::String
+pub signal_desktop_core::TimelineEntry::timestamp: i64
+pub struct signal_desktop_core::WindowState
+pub signal_desktop_core::WindowState::fullscreen: core::option::Option<bool>
+pub signal_desktop_core::WindowState::height: core::option::Option<i64>
+pub signal_desktop_core::WindowState::maximized: core::option::Option<bool>
+pub signal_desktop_core::WindowState::width: core::option::Option<i64>
+pub signal_desktop_core::WindowState::x: core::option::Option<i64>
+pub signal_desktop_core::WindowState::y: core::option::Option<i64>
+pub fn signal_desktop_core::build_timeline(&[signal_desktop_core::records::Message]) -> alloc::vec::Vec<signal_desktop_core::timeline::TimelineEntry>
+pub fn signal_desktop_core::unwrap_sqlcipher_key(&chromium_safestorage_core::cookie::RecoveredKey, &signal_desktop_core::config::SignalConfig) -> signal_desktop_core::error::Result<signal_desktop_core::keys::SqlcipherKey>
+pub type signal_desktop_core::Result<T> = core::result::Result<T, signal_desktop_core::error::SignalError>

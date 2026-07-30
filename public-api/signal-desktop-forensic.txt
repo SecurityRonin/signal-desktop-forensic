@@ -1,0 +1,33 @@
+pub mod signal_desktop_forensic
+pub mod signal_desktop_forensic::analyze
+#[non_exhaustive] pub enum signal_desktop_forensic::analyze::SignalAnomaly
+pub signal_desktop_forensic::analyze::SignalAnomaly::AttachmentResidue
+pub signal_desktop_forensic::analyze::SignalAnomaly::AttachmentResidue::message_id: alloc::string::String
+pub signal_desktop_forensic::analyze::SignalAnomaly::AttachmentResidue::path: alloc::string::String
+pub signal_desktop_forensic::analyze::SignalAnomaly::OrphanMessage
+pub signal_desktop_forensic::analyze::SignalAnomaly::OrphanMessage::conversation_id: alloc::string::String
+pub signal_desktop_forensic::analyze::SignalAnomaly::OrphanMessage::message_id: alloc::string::String
+impl forensicnomicon_core::report::Observation for signal_desktop_forensic::analyze::SignalAnomaly
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::category(&self) -> forensicnomicon_core::report::Category
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::code(&self) -> &'static str
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::note(&self) -> alloc::string::String
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::severity(&self) -> core::option::Option<forensicnomicon_core::report::Severity>
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::subjects(&self) -> alloc::vec::Vec<forensicnomicon_core::report::SubjectRef>
+pub fn signal_desktop_forensic::analyze::audit(&[signal_desktop_core::records::Conversation], &[signal_desktop_core::records::Message], &[signal_desktop_core::records::Attachment]) -> alloc::vec::Vec<forensicnomicon_core::report::Finding>
+pub fn signal_desktop_forensic::analyze::audit_store(&signal_desktop_core::store::SignalStore) -> signal_desktop_core::error::Result<alloc::vec::Vec<forensicnomicon_core::report::Finding>>
+#[non_exhaustive] pub enum signal_desktop_forensic::SignalAnomaly
+pub signal_desktop_forensic::SignalAnomaly::AttachmentResidue
+pub signal_desktop_forensic::SignalAnomaly::AttachmentResidue::message_id: alloc::string::String
+pub signal_desktop_forensic::SignalAnomaly::AttachmentResidue::path: alloc::string::String
+pub signal_desktop_forensic::SignalAnomaly::OrphanMessage
+pub signal_desktop_forensic::SignalAnomaly::OrphanMessage::conversation_id: alloc::string::String
+pub signal_desktop_forensic::SignalAnomaly::OrphanMessage::message_id: alloc::string::String
+impl forensicnomicon_core::report::Observation for signal_desktop_forensic::analyze::SignalAnomaly
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::category(&self) -> forensicnomicon_core::report::Category
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::code(&self) -> &'static str
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::note(&self) -> alloc::string::String
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::severity(&self) -> core::option::Option<forensicnomicon_core::report::Severity>
+pub fn signal_desktop_forensic::analyze::SignalAnomaly::subjects(&self) -> alloc::vec::Vec<forensicnomicon_core::report::SubjectRef>
+pub const signal_desktop_forensic::ANALYZER: &str
+pub fn signal_desktop_forensic::audit(&[signal_desktop_core::records::Conversation], &[signal_desktop_core::records::Message], &[signal_desktop_core::records::Attachment]) -> alloc::vec::Vec<forensicnomicon_core::report::Finding>
+pub fn signal_desktop_forensic::audit_store(&signal_desktop_core::store::SignalStore) -> signal_desktop_core::error::Result<alloc::vec::Vec<forensicnomicon_core::report::Finding>>
