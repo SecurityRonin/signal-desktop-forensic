@@ -96,6 +96,34 @@ mod tests {
     }
 
     #[test]
+    fn bodyless_messages_get_the_attachment_or_no_body_placeholder() {
+        // An attachment-only message (Signal stores no body for one) must read as
+        // "[attachment]", not as an empty summary — the entry is still evidence
+        // that something was sent.
+        let mut absent_body_with_att = msg("att", Some(1), None, None);
+        absent_body_with_att.has_attachments = true;
+        // An empty-string body is the same case as an absent one: SQLite stores
+        // '' as well as NULL, and both mean "no text to preview".
+        let mut empty_body_with_att = msg("empty_att", Some(2), None, Some(""));
+        empty_body_with_att.has_attachments = true;
+        // No body and no attachment: the fallback placeholder.
+        let absent_body = msg("nothing", Some(3), None, None);
+        let empty_body = msg("empty", Some(4), None, Some(""));
+
+        let tl = build_timeline(&[
+            absent_body_with_att,
+            empty_body_with_att,
+            absent_body,
+            empty_body,
+        ]);
+        let summaries: Vec<&str> = tl.iter().map(|e| e.summary.as_str()).collect();
+        assert_eq!(
+            summaries,
+            ["[attachment]", "[attachment]", "[no body]", "[no body]"]
+        );
+    }
+
+    #[test]
     fn summary_is_char_safe_and_has_placeholders() {
         let mut m = msg("emoji", Some(1), None, Some("😀 привет 中文 hello"));
         // truncation must not panic on multibyte content.

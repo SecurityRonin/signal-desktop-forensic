@@ -351,6 +351,27 @@ mod tests {
         (dir, db)
     }
 
+    /// Add rows whose `json` column carries no parseable object — one NULL and
+    /// one syntactically broken — into an already-minted fixture. This is the
+    /// schema-drift / corruption path the module doc promises degrades to `None`
+    /// identity fields rather than panicking or dropping the row.
+    fn add_unparseable_json_rows(db: &Path) {
+        let conn = Connection::open(db).expect("reopen minted db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO conversations (id, type, active_at, json)
+                 VALUES ('conv-nulljson', 'private', 1700000700000, NULL),
+                        ('conv-badjson',  'private', 1700000800000, '{not json');
+             INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json)
+                 VALUES ('msg-nulljson', 'conv-nulljson', 1700000700000, 1700000700010,
+                         'incoming', 'no json column', NULL),
+                        ('msg-badjson',  'conv-badjson',  1700000800000, 1700000800010,
+                         'incoming', 'broken json column', '{not json');",
+        )
+        .expect("insert unparseable-json rows");
+    }
+
     #[test]
     fn opens_with_correct_key() {
         let (_dir, db) = minted();
@@ -473,6 +494,57 @@ mod tests {
             SignalStore::open_profile(dir.path(), &fixture_key()),
             Err(SignalError::DbOpen(_))
         ));
+    }
+
+    #[test]
+    fn conversation_with_unparseable_json_keeps_the_row_with_none_identity() {
+        let (_dir, db) = minted();
+        add_unparseable_json_rows(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let convs = store.conversations().unwrap();
+        // Both degenerate rows are KEPT — dropping a row loses evidence.
+        assert_eq!(convs.len(), 4);
+        for id in ["conv-nulljson", "conv-badjson"] {
+            let c = convs.iter().find(|c| c.id == id).unwrap();
+            // Identity fields live in `json`, so with no parseable json they are
+            // None — never a panic, and never a fabricated value.
+            assert_eq!(c.service_id, None);
+            assert_eq!(c.e164, None);
+            assert_eq!(c.name, None);
+            // The columns that do NOT come from json still read normally.
+            assert_eq!(c.kind, ConversationKind::Private);
+            assert!(c.active_at.is_some());
+        }
+        // Such a row is still projected as a contact (a private conversation),
+        // just an unidentified one.
+        let contacts = store.contacts().unwrap();
+        assert_eq!(contacts.len(), 3);
+        assert!(contacts
+            .iter()
+            .any(|c| c.conversation_id == "conv-nulljson" && c.name.is_none()));
+    }
+
+    #[test]
+    fn message_with_unparseable_json_keeps_the_row_with_no_source_or_attachments() {
+        let (_dir, db) = minted();
+        add_unparseable_json_rows(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let msgs = store.messages().unwrap();
+        assert_eq!(msgs.len(), 5);
+        for id in ["msg-nulljson", "msg-badjson"] {
+            let m = msgs.iter().find(|m| m.id == id).unwrap();
+            // `sourceServiceId` and `attachments[]` are json-only fields.
+            assert_eq!(m.source_service_id, None);
+            assert!(!m.has_attachments);
+            // The non-json columns are unaffected — the body is still evidence.
+            assert_eq!(m.direction, Direction::Incoming);
+            assert!(m.body.is_some());
+            assert!(m.sent_at.is_some());
+        }
+        // A row with no parseable json contributes no attachment metadata.
+        let atts = store.attachments().unwrap();
+        assert_eq!(atts.len(), 1);
+        assert_eq!(atts[0].message_id, "msg-2");
     }
 
     #[test]

@@ -216,6 +216,30 @@ mod tests {
     }
 
     #[test]
+    fn message_with_no_conversation_id_is_not_flagged_orphan() {
+        // A NULL `conversationId` carries no dangling reference: there is no id to
+        // report as missing, so the orphan check must pass it over rather than
+        // invent a conversation id or flag every unlinked row.
+        let conversations = vec![conv("c1")];
+        let messages = vec![msg("m-null", None), msg("m1", Some("c1"))];
+        assert!(audit(&conversations, &messages, &[]).is_empty());
+    }
+
+    #[test]
+    fn attachment_with_no_path_is_not_flagged_residue() {
+        // Residue is the on-disk blob. Attachment metadata with no `path` points
+        // at nothing under attachments.noindex, so there is no residue to report.
+        let att = Attachment {
+            message_id: "m1".to_owned(),
+            content_type: Some("image/jpeg".to_owned()),
+            file_name: Some("pic.jpg".to_owned()),
+            size: Some(1),
+            path: None,
+        };
+        assert!(audit(&[], &[], &[att]).is_empty());
+    }
+
+    #[test]
     fn clean_records_produce_no_findings() {
         let conversations = vec![conv("c1")];
         let messages = vec![msg("m1", Some("c1"))];
