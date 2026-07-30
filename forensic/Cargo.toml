@@ -1,6 +1,6 @@
 [package]
 name = "signal-desktop-forensic"
-version = "0.1.0"
+version = "0.1.1"
 description = "Signal Desktop anomaly auditor — grades a decrypted Signal profile into normalized forensicnomicon findings (disappearing-message posture, deleted-but-present records, attachment residue)."
 edition.workspace = true
 rust-version.workspace = true

@@ -24,7 +24,7 @@ readme = "README.md"
 # write `dep.workspace = true`. Fleet path deps are unpublished Wave-1/2 outputs
 # — switch to the registry version once each publishes (see the fleet rule).
 [workspace.dependencies]
-signal-desktop-core = { path = "core", version = "0.1.0" }
+signal-desktop-core = { path = "core", version = "0.2.0" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

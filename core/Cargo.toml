@@ -1,6 +1,6 @@
 [package]
 name = "signal-desktop-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "Signal Desktop reader — recover the SQLCipher key from config.json via the OS Safe Storage, open sql/db.sqlite, and parse messages, conversations, contacts, and attachment metadata into typed records + a timeline."
 edition.workspace = true
 rust-version.workspace = true
