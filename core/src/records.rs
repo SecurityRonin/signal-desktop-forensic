@@ -70,8 +70,23 @@ pub struct Message {
     pub body: Option<String>,
     /// Send timestamp (ms since the Unix epoch), if recorded.
     pub sent_at: Option<i64>,
-    /// Receive timestamp (ms since the Unix epoch), if recorded.
+    /// Signal's `received_at` column: a monotonically increasing **ordering
+    /// counter**, *not* a timestamp.
+    ///
+    /// Modern Signal Desktop assigns each incoming row the next counter value so
+    /// the UI has a stable order; the wall-clock receive time lives in
+    /// [`Self::received_at_ms`]. Use this only as an ordering tiebreak — reading
+    /// it as an epoch dates a message to 1970. (Older revisions did hold ms
+    /// here, which is exactly why a reader must prefer the explicit
+    /// `received_at_ms`/`serverTimestamp` columns and never fall back to this
+    /// one for time.)
     pub received_at: Option<i64>,
+    /// Wall-clock receive time (`received_at_ms`, ms since the Unix epoch), if
+    /// the schema revision has the column and the row records one.
+    pub received_at_ms: Option<i64>,
+    /// Server-assigned timestamp (`serverTimestamp`, ms since the Unix epoch),
+    /// if recorded — present on server-delivered messages.
+    pub server_timestamp: Option<i64>,
     /// The sender's service id (`sourceServiceId`/`source`), if any.
     pub source_service_id: Option<String>,
     /// Whether the message carries attachment metadata.

@@ -71,9 +71,9 @@ with a known raw key), then decrypts and reads it **two independent ways**:
    `PRAGMA key = "x'…'"` and `SELECT`s the rows in `.mode json`.
 
 It reconciles both directions: equal **counts**, and equal **contents** per row
-(`id`, `conversationId`, `sent_at`, `received_at`, `type`, `body` for messages;
-`id`, `type`, `active_at` for conversations). Any divergence fails loud with the
-mismatched rows.
+(`id`, `conversationId`, `sent_at`, `received_at`, `received_at_ms`, `type`,
+`body` for messages; `id`, `type`, `active_at` for conversations). Any divergence
+fails loud with the mismatched rows.
 
 **Independence, stated honestly.** This is **tier-2**: we authored the fixture
 and its rows, so it is not tier-1 (no independent party wrote both the artifact
@@ -98,6 +98,28 @@ SIGNAL_SQLCIPHER_ORACLE=$(command -v sqlcipher) \
 
 Latest run: **3 messages + 2 conversations reconciled**, oracle
 `sqlcipher 3.53.3 (SQLCipher 4.17.0 community)`.
+
+## Source differential against DLEAPP (tier-2, column semantics)
+
+The timestamp columns were reconciled against **DLEAPP**'s production Signal
+Desktop artifact (`scripts/artifacts/signalMessages.py`), an independently
+authored reference implementation. Its query selects **`received_at_ms`** and
+formats that value as the message time; it never reads the bare `received_at`.
+That matches Signal Desktop's own schema, where `received_at` is a
+**monotonically increasing ordering counter** and `received_at_ms` is the
+wall-clock receive time (`serverTimestamp` for server-stamped rows).
+
+Our reader previously took `sent_at`, else `received_at` — so a row with no
+`sent_at` published the counter as an epoch (a ~1970 timestamp in a forensic
+timeline). The minted fixture had concealed it by writing an epoch into
+`received_at`; it now carries small counters there and the epoch in
+`received_at_ms`, which is what a real profile looks like. The reader's
+preference is `sent_at` → `received_at_ms` → `serverTimestamp` → none, and
+`received_at` is retained and documented as the ordering value it is (useful as
+a stable-ordering tiebreak, never as a time). A schema revision lacking
+`received_at_ms`/`serverTimestamp` still reads (the columns are probed via
+`PRAGMA table_info` and projected as `NULL` when absent) and such a row simply
+has no timestamp — it never degrades to the counter.
 
 ## Robustness (fuzzing) — measured
 

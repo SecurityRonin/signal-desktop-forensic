@@ -167,7 +167,10 @@ mod tests {
             direction: Direction::Incoming,
             body: Some("hi".to_owned()),
             sent_at: Some(1),
-            received_at: None,
+            // `received_at` is an ordering counter, not a time.
+            received_at: Some(1),
+            received_at_ms: None,
+            server_timestamp: None,
             source_service_id: None,
             has_attachments: false,
         }
@@ -249,6 +252,10 @@ mod tests {
     /// Mint a real SQLCipher `db.sqlite` in Signal's schema, encrypted with a
     /// known raw key, carrying one orphan message (references a missing
     /// conversation) and one attachment with an on-disk path (residue).
+    ///
+    /// Deliberately a LEGACY revision — no `received_at_ms`/`serverTimestamp`
+    /// column — so the analyzer path is exercised over the older schema too.
+    /// `received_at` holds the ordering counter it really is (1, 2).
     fn mint_db(path: &std::path::Path, key_hex: &str) {
         use rusqlite::{params, Connection};
         let conn = Connection::open(path).unwrap();
@@ -273,7 +280,7 @@ mod tests {
         conn.execute(
             "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json) VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![
-                "msg-orphan", "conv-deleted", 1_700_000_100_000i64, 1_700_000_100_010i64,
+                "msg-orphan", "conv-deleted", 1_700_000_100_000i64, 1i64,
                 "incoming", "still here", r#"{"id":"msg-orphan","attachments":[]}"#
             ],
         )
@@ -282,7 +289,7 @@ mod tests {
         conn.execute(
             "INSERT INTO messages (id, conversationId, sent_at, received_at, type, body, json) VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![
-                "msg-att", "conv-alice", 1_700_000_200_000i64, 1_700_000_200_010i64,
+                "msg-att", "conv-alice", 1_700_000_200_000i64, 2i64,
                 "outgoing", "photo", r#"{"id":"msg-att","attachments":[{"contentType":"image/jpeg","path":"ab/abcdef"}]}"#
             ],
         )

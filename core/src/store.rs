@@ -105,12 +105,12 @@ impl SignalStore {
 
     /// All messages.
     pub fn messages(&self) -> Result<Vec<Message>> {
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT id, conversationId, sent_at, received_at, type, body, json FROM messages",
-            )
-            .map_err(SignalError::Query)?;
+        let present = table_columns(&self.conn, "messages")?;
+        let sql = format!(
+            "SELECT id, conversationId, sent_at, received_at, type, body, json, {} FROM messages",
+            optional_projection(&present, &OPTIONAL_MESSAGE_COLUMNS)
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(SignalError::Query)?;
         let rows = stmt
             .query_map([], |row| {
                 Ok((
@@ -121,14 +121,25 @@ impl SignalStore {
                     row.get::<_, Option<String>>(4)?,
                     row.get::<_, Option<String>>(5)?,
                     row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<i64>>(7)?,
+                    row.get::<_, Option<i64>>(8)?,
                 ))
             })
             .map_err(SignalError::Query)?;
 
         let mut out = Vec::new();
         for row in rows {
-            let (id, conversation_id, sent_at, received_at, typ, body, json) =
-                row.map_err(SignalError::Query)?;
+            let (
+                id,
+                conversation_id,
+                sent_at,
+                received_at,
+                typ,
+                body,
+                json,
+                received_at_ms,
+                server_timestamp,
+            ) = row.map_err(SignalError::Query)?;
             let v: Option<Value> = json.as_deref().and_then(|s| serde_json::from_str(s).ok());
             let direction = Direction::from_type(typ.as_deref().unwrap_or_default());
             let (source_service_id, has_attachments) = match &v {
@@ -147,6 +158,8 @@ impl SignalStore {
                 body,
                 sent_at,
                 received_at,
+                received_at_ms,
+                server_timestamp,
                 source_service_id,
                 has_attachments,
             });
@@ -221,6 +234,49 @@ pub fn parse_attachments_json(message_id: &str, json: &str) -> Vec<Attachment> {
             path: str_field(a, "path"),
         })
         .collect()
+}
+
+/// `messages` columns that only exist on some Signal schema revisions, in the
+/// order they are appended to the projection.
+const OPTIONAL_MESSAGE_COLUMNS: [&str; 2] = ["received_at_ms", "serverTimestamp"];
+
+/// The column names a table actually has, from `PRAGMA table_info`.
+///
+/// Signal's schema drifts across app versions, so a column the current release
+/// writes may be absent on an older profile. Probing beats assuming: selecting a
+/// column that does not exist makes SQLite reject the whole statement, which
+/// would turn a readable legacy database into a hard failure.
+fn table_columns(conn: &Connection, table: &str) -> Result<std::collections::HashSet<String>> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(SignalError::Query)?;
+    // `PRAGMA table_info` column 1 is the column name.
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(SignalError::Query)?;
+    let mut out = std::collections::HashSet::new();
+    for row in rows {
+        out.insert(row.map_err(SignalError::Query)?);
+    }
+    Ok(out)
+}
+
+/// Project each optional column, substituting `NULL AS <col>` for the ones this
+/// schema revision lacks — so the row indices are fixed regardless of the
+/// revision, and an absent column reads as `None` (never as some other column's
+/// value).
+fn optional_projection(present: &std::collections::HashSet<String>, wanted: &[&str]) -> String {
+    wanted
+        .iter()
+        .map(|col| {
+            if present.contains(*col) {
+                (*col).to_owned()
+            } else {
+                format!("NULL AS {col}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Read a string field from a JSON object, if present and a string.
@@ -494,6 +550,11 @@ mod tests {
         assert_eq!(m1.body.as_deref(), Some("hey there"));
         assert_eq!(m1.conversation_id.as_deref(), Some("conv-alice"));
         assert_eq!(m1.sent_at, Some(1_700_000_100_000));
+        // The two receive columns are read as the distinct things they are: an
+        // ordering counter and a wall-clock time.
+        assert_eq!(m1.received_at, Some(1));
+        assert_eq!(m1.received_at_ms, Some(1_700_000_100_050));
+        assert_eq!(m1.server_timestamp, None);
         assert_eq!(m1.source_service_id.as_deref(), Some("uuid-alice"));
         assert!(!m1.has_attachments);
 

@@ -28,10 +28,12 @@ use serde_json::Value;
 
 use signal_desktop_core::{ConversationKind, SignalStore, SqlcipherKey};
 
-/// A comparable message row: `(id, conversationId, sent_at, received_at, type, body)`.
+/// A comparable message row:
+/// `(id, conversationId, sent_at, received_at, received_at_ms, type, body)`.
 type MsgRow = (
     String,
     Option<String>,
+    Option<i64>,
     Option<i64>,
     Option<i64>,
     String,
@@ -219,7 +221,8 @@ fn differential_reader_matches_sqlcipher_cli() {
     let key = SqlcipherKey::from_hex(FIXTURE_KEY_HEX).unwrap();
     let store = SignalStore::open_at(&db, &key).expect("our reader opens the minted db");
 
-    // --- Messages: reconcile (id, conversationId, sent_at, received_at, type, body). ---
+    // --- Messages: reconcile
+    // (id, conversationId, sent_at, received_at, received_at_ms, type, body). ---
     let mut ours_msgs: Vec<MsgRow> = store
         .messages()
         .unwrap()
@@ -230,6 +233,7 @@ fn differential_reader_matches_sqlcipher_cli() {
                 m.conversation_id,
                 m.sent_at,
                 m.received_at,
+                m.received_at_ms,
                 m.direction.to_string(),
                 m.body,
             )
@@ -240,7 +244,8 @@ fn differential_reader_matches_sqlcipher_cli() {
     let cli_msg_rows = cli_rows(
         oracle,
         &db,
-        "SELECT id, conversationId, sent_at, received_at, type, body FROM messages ORDER BY id;",
+        "SELECT id, conversationId, sent_at, received_at, received_at_ms, type, body \
+         FROM messages ORDER BY id;",
     );
     let mut cli_msgs: Vec<MsgRow> = cli_msg_rows
         .iter()
@@ -250,6 +255,7 @@ fn differential_reader_matches_sqlcipher_cli() {
                 opt_str(r, "conversationId"),
                 opt_i64(r, "sent_at"),
                 opt_i64(r, "received_at"),
+                opt_i64(r, "received_at_ms"),
                 opt_str(r, "type").expect("cli message type"),
                 opt_str(r, "body"),
             )
