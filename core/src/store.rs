@@ -406,6 +406,8 @@ pub(crate) mod testsupport {
                  serverTimestamp INTEGER,
                  type TEXT,
                  body TEXT,
+                 isViewOnce INTEGER,
+                 isErased INTEGER,
                  json TEXT
              );",
         )
@@ -540,6 +542,28 @@ pub(crate) mod testsupport {
         .expect("create message_attachments");
     }
 
+    /// Add the three shapes whose **empty body is explained by a flag**: a
+    /// view-once message, an erased one, and one whose flag survives only in the
+    /// message `json` (an older revision's home for it).
+    pub(crate) fn add_view_once_and_erased_messages(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("reopen minted db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, received_at_ms, type, body,
+                  isViewOnce, isErased, json)
+             VALUES ('msg-viewonce', 'conv-alice', 1700001100000, 44, 1700001100010,
+                     'incoming', NULL, 1, 0, '{\"id\":\"msg-viewonce\"}'),
+                    ('msg-erased', 'conv-alice', 1700001200000, 45, 1700001200010,
+                     'incoming', '', 0, 1, '{\"id\":\"msg-erased\"}'),
+                    ('msg-json-erased', 'conv-alice', 1700001300000, 46, 1700001300010,
+                     'incoming', NULL, NULL, NULL,
+                     '{\"id\":\"msg-json-erased\",\"isErased\":true}');",
+        )
+        .expect("insert view-once / erased messages");
+    }
+
     /// Give `msg-2` — which already carries a legacy `json.attachments[]` entry
     /// (`ab/abcdef0123`) — a `message_attachments` row too, as a profile part-way
     /// through Signal's migration has. Requires
@@ -601,7 +625,8 @@ pub(crate) mod testsupport {
 mod tests {
     use super::testsupport::{
         add_message_attachments_table, add_migrated_attachment_row, add_receive_only_messages,
-        fixture_key, mint_legacy_signal_db, mint_signal_db, FIXTURE_KEY_HEX,
+        add_view_once_and_erased_messages, fixture_key, mint_legacy_signal_db, mint_signal_db,
+        FIXTURE_KEY_HEX,
     };
     use super::*;
     use crate::keys::SqlcipherKey;
@@ -955,6 +980,81 @@ mod tests {
         assert_eq!(for_msg2.len(), 1, "the migrated attachment is not doubled");
         assert_eq!(for_msg2[0].path.as_deref(), Some("ef/ef0123456789"));
         assert_eq!(atts.len(), 2);
+    }
+
+    #[test]
+    fn view_once_and_erased_flags_explain_an_empty_body() {
+        // An empty body is not necessarily an empty message: view-once media that
+        // was opened, or content Signal erased in place, leaves the row with no
+        // text. Without these flags an analyst cannot tell either from a message
+        // that genuinely carried nothing.
+        let (_dir, db) = minted();
+        add_view_once_and_erased_messages(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let msgs = store.messages().unwrap();
+        let by_id = |id: &str| {
+            msgs.iter()
+                .find(|m| m.id == id)
+                .unwrap_or_else(|| panic!("message {id}"))
+                .clone()
+        };
+
+        let view_once = by_id("msg-viewonce");
+        assert_eq!(view_once.is_view_once, Some(true));
+        assert_eq!(view_once.is_erased, Some(false));
+
+        let erased = by_id("msg-erased");
+        assert_eq!(erased.is_view_once, Some(false));
+        assert_eq!(erased.is_erased, Some(true));
+
+        // An older revision records the flag only in the message json.
+        let json_erased = by_id("msg-json-erased");
+        assert_eq!(json_erased.is_erased, Some(true));
+        assert_eq!(json_erased.is_view_once, None);
+
+        // A row that records nothing either way stays unrecorded — reporting
+        // `false` would state a fact the profile does not carry.
+        let plain = by_id("msg-1");
+        assert_eq!(plain.is_view_once, None);
+        assert_eq!(plain.is_erased, None);
+    }
+
+    #[test]
+    fn legacy_schema_records_no_view_once_or_erased_flags() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("db.sqlite");
+        mint_legacy_signal_db(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let msgs = store.messages().unwrap();
+        // No such columns on this revision: unrecorded, not `false`.
+        assert!(msgs
+            .iter()
+            .all(|m| m.is_view_once.is_none() && m.is_erased.is_none()));
+    }
+
+    #[test]
+    fn table_attachment_carries_the_plaintext_hash() {
+        // `plaintextHash` identifies the decrypted file content, so an examiner
+        // can hash-match the attachment without decrypting the blob.
+        let (_dir, db) = minted();
+        add_message_attachments_table(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+        let atts = store.attachments().unwrap();
+
+        let modern = atts
+            .iter()
+            .find(|a| a.message_id == "msg-modern-att")
+            .expect("table attachment");
+        assert_eq!(
+            modern.plaintext_hash.as_deref(),
+            Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        );
+        // The legacy json form records no hash.
+        let legacy = atts
+            .iter()
+            .find(|a| a.message_id == "msg-2")
+            .expect("legacy json attachment");
+        assert_eq!(legacy.plaintext_hash, None);
     }
 
     #[test]

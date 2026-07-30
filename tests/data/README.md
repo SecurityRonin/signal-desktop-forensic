@@ -65,6 +65,11 @@ the DB is generated per test run.
     `msg-server-only` (`sent_at` NULL, `received_at` counter 43, `received_at_ms`
     NULL, `serverTimestamp` 1700001000000): the rows whose time can only come from a
     wall-clock column.
+  - `testsupport::add_view_once_and_erased_messages(db)` — appends the rows whose
+    empty body is explained by a flag: `msg-viewonce` (body NULL, `isViewOnce` 1,
+    `isErased` 0), `msg-erased` (body `''`, `isViewOnce` 0, `isErased` 1), and
+    `msg-json-erased` (both columns NULL, `json` carrying `"isErased":true` — the
+    older revision's home for the flag).
   - `testsupport::add_message_attachments_table(db)` — appends `msg-modern-att`
     (`sent_at` 1700000700000, counter 4, `received_at_ms` 1700000700020, body NULL,
     `json` with **no** `attachments` array) plus the modern
