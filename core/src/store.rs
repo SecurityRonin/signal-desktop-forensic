@@ -647,13 +647,40 @@ pub(crate) mod testsupport {
         )
         .expect("create legacy schema");
     }
+
+    /// Add the row a **real** pre-migration-1270 profile actually has: no
+    /// `received_at_ms`/`serverTimestamp` *columns*, but both values present
+    /// inside the message `json`.
+    ///
+    /// This is not a hypothetical. Signal-Desktop migration 1270
+    /// (`1270-normalize-messages.std.ts`) ADDS those columns and backfills them
+    /// with `json_extract(json, '$.received_at_ms')` / `'$.serverTimestamp'` —
+    /// which is only possible because every earlier revision stored them in the
+    /// json. So on any 2021–2025 profile the wall-clock receive time is in the
+    /// json and nowhere else.
+    pub(crate) fn add_legacy_json_timestamp_message(db_path: &Path) {
+        let conn = Connection::open(db_path).expect("open db");
+        conn.execute_batch(&format!("PRAGMA key = \"x'{FIXTURE_KEY_HEX}'\";"))
+            .expect("set key");
+        conn.execute_batch(
+            "INSERT INTO messages
+                 (id, conversationId, sent_at, received_at, type, body, json)
+             VALUES ('msg-legacy-json-ts', 'conv-alice', NULL, 8,
+                     'incoming', 'legacy receive-only, timestamps in json',
+                     '{\"id\":\"msg-legacy-json-ts\",\
+                        \"received_at_ms\":1700000900000,\
+                        \"serverTimestamp\":1700000800000}');",
+        )
+        .expect("insert legacy json-timestamp row");
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::testsupport::{
         add_message_attachments_table, add_migrated_attachment_row, add_receive_only_messages,
-        add_view_once_and_erased_messages, fixture_key, mint_legacy_signal_db, mint_signal_db,
+        add_legacy_json_timestamp_message, add_view_once_and_erased_messages, fixture_key,
+        mint_legacy_signal_db, mint_signal_db,
         FIXTURE_KEY_HEX,
     };
     use super::*;
@@ -937,6 +964,32 @@ mod tests {
             legacy_recv.timestamp, 0,
             "with no wall-clock column present the timestamp is absent (0), \
              never the received_at ordering counter (7)"
+        );
+    }
+
+    #[test]
+    fn legacy_schema_reads_the_wall_clock_time_from_the_message_json() {
+        // The case a real pre-2025 profile presents: no `received_at_ms` COLUMN,
+        // but the value is in the message `json` — which is precisely why Signal's
+        // migration 1270 can backfill the new column from
+        // `json_extract(json, '$.received_at_ms')`. Reading only the column drops a
+        // wall-clock time that is right there, publishing 0 into a forensic
+        // timeline for every 2021–2025 profile.
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("db.sqlite");
+        mint_legacy_signal_db(&db);
+        add_legacy_json_timestamp_message(&db);
+        let store = SignalStore::open_at(&db, &fixture_key()).unwrap();
+
+        let tl = store.timeline().unwrap();
+        let entry = tl
+            .iter()
+            .find(|e| e.message_id == "msg-legacy-json-ts")
+            .expect("the legacy json-timestamp entry");
+        assert_eq!(
+            entry.timestamp, 1_700_000_900_000,
+            "the wall-clock time in json.received_at_ms must be used when the \
+             column does not exist — never dropped to 0, and never the counter (8)"
         );
     }
 
